@@ -27,8 +27,21 @@ The final 17-section instructional structure is frozen in the design baseline.
 The core bigram-to-minimal-GPT execution path is implemented, including
 positional embeddings and complete Transformer blocks. Evidence-mode
 automation, multi-seed metrics, diagrams, and the required report remain
-pending. The external-foundations bridge is reserved for Step 4 and is not yet
-part of this repository.
+pending. The external-foundations bridge is now defined below. Remaining implementation
+work is tracked in the design baseline.
+
+## Relationship to AI Enterprise Lab 0
+
+The AI Enterprise course’s
+[Lab 0 Foundations Baseline](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_FOUNDATIONS_BASELINE.md)
+is the required, independently completable preparation for its enterprise labs.
+It covers pretrained-model inference, retrieval embeddings, vector similarity,
+RAG, agents, MCP, and evidence boundaries without requiring model training.
+
+This Handmade GPT practicum is optional deeper study of model internals:
+training, loss, token embeddings, attention, positional embeddings, and
+Transformer blocks. Completing it does not replace Lab 0 or satisfy the
+[Lab 0 → Lab 1 dependency contract](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_LAB1_DEPENDENCY_CONTRACT.md).
 
 ## Quick start
 
