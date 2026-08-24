@@ -26,9 +26,10 @@ feedforward sublayers, and stacked Transformer blocks.
 
 The final 17-section instructional structure is frozen in the design baseline.
 The core bigram-to-minimal-GPT execution path is implemented, including
-positional embeddings and complete Transformer blocks. Evidence-mode
-automation, multi-seed metrics, diagrams, and the required report remain
-pending. The external-foundations bridge is now defined below. Remaining implementation
+positional embeddings and complete Transformer blocks. Static, learning, and
+full evidence execution passed on Apple MPS; canonical JSON is stored under
+`evidence/setup/`. Multi-seed metrics, diagrams, and the required report
+remain pending. The external-foundations bridge is now defined below. Remaining implementation
 work is tracked in the design baseline.
 
 ## Relationship to AI Enterprise Lab 0
@@ -67,7 +68,7 @@ The dataset check should report 1,115,394 bytes.
 
 Every training script:
 
-- Selects MPS when available and otherwise uses CPU
+- Selects CUDA when available, then Apple MPS, and otherwise CPU
 - Prints periodic training-batch loss for progress only
 - Reports averaged training and validation loss over 200 batches
 - Reports validation perplexity
