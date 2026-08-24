@@ -10,6 +10,47 @@ bigram-to-attention progression. See [SOURCES.md](SOURCES.md).
 > No evidence, no credit. A script completing is execution evidence; it is not
 > proof that one architecture generalizes better than another.
 
+## 0. Frozen structure and current coverage
+
+[HANDMADE_GPT_DESIGN_BASELINE.md](HANDMADE_GPT_DESIGN_BASELINE.md) is
+authoritative for this practicum's final scope, sequence, outcomes, artifacts,
+and completion gates. The existing procedures below exercise the implemented
+core, but they do not yet constitute the complete frozen practicum.
+
+| Frozen section | Current coverage | Status |
+|---|---|---|
+| 1. Purpose, provenance, and boundary | Lab introduction and Section 1 | Implemented |
+| 2. Minimal applied mathematics | Entropy and tensor-shape questions | Partial |
+| 3. Text, tokens, and token IDs | Step 2 | Implemented |
+| 4. Token embeddings | Steps 2, 3, and 8 | Partial |
+| 5. Training versus inference | Model execution tasks | Partial |
+| 6. Bigram baseline | Step 3 | Implemented |
+| 7. Empirical entropy | Step 3 | Implemented |
+| 8. Uniform causal context | Step 4 | Implemented |
+| 9. Single-head attention | Step 5 | Partial; hand calculation pending |
+| 10. Multi-head attention | Step 6 | Implemented |
+| 11. Positional embeddings | Step 8 | Implemented |
+| 12. Complete Transformer block | Step 8 | Implemented |
+| 13. Stacked minimal GPT | Step 8 | Implemented |
+| 14. Logits, softmax, temperature, sampling | Generation only | Partial |
+| 15. Evaluation and repeatability | Averaged loss/perplexity | Partial |
+| 16. External-foundations boundary | Reserved for integration Step 4 | Deferred |
+| 17. Required report | No report template yet | Pending |
+
+Remaining work includes complete applied-math exercises, explicit
+training-versus-inference parameter evidence, command-line learning/evidence
+modes, greedy and temperature comparisons, top-1/top-3 accuracy, multi-seed
+summaries, JSON metrics, architecture diagrams, and
+`HANDMADE_GPT_REPORT.md`.
+
+The current `S1-T1`/`S1-Q1` identifiers are transitional. As the missing
+sections are implemented, all student work must be normalized to the frozen
+`HGPT-S<section>-T<task>` and `HGPT-S<section>-Q<question>` convention.
+Questions must remain adjacent to the task that produces their evidence.
+
+The short external-foundations boundary and any cross-repository links are
+explicitly outside Step 3 and remain deferred to Step 4.
+
 ## 1. Purpose and architecture boundary
 
 This lab opens the language-model “black box” by constructing increasingly
