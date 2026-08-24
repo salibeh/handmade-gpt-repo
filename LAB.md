@@ -1,4 +1,4 @@
-# Lab — From Bigram Prediction to Causal Attention
+# Lab — From Bigram Prediction to a Minimal GPT
 
 **Source-driven origin:** This lab was initiated by Nikhil Bajpai’s Medium
 article, [“I Built a GPT From Scratch on a MacBook — Days 1–5: From a Bigram
@@ -18,10 +18,11 @@ bigram model can learn, calculate its empirical information limit, deliberately
 try a weak way of using more context, and then replace fixed context weights
 with learned causal attention.
 
-The last stage is not yet a complete GPT. It has causal multi-head attention
-but lacks positional embeddings, feedforward sublayers, residual connections,
-LayerNorm, and stacked Transformer blocks. Calling that endpoint a complete GPT
-would hide the exact mechanisms still missing.
+The article-aligned attention stage is not a complete GPT. The final extension
+in this lab adds positional embeddings, attention output projection,
+feedforward sublayers, residual connections, pre-LayerNorm, final LayerNorm,
+and stacked decoder blocks. It is a complete minimal decoder-only GPT
+architecture, not a large or production-capable language model.
 
 ## 2. Learning objectives
 
@@ -36,7 +37,8 @@ After completing the lab, students should be able to:
 7. Explain the distinct Query, Key, and Value roles.
 8. Trace tensor shapes through single-head and multi-head attention.
 9. Interpret a negative experimental result without treating it as failure.
-10. State why the final attention model is not yet a complete GPT.
+10. Distinguish the article-aligned attention endpoint from the complete minimal GPT extension.
+11. Trace positional embeddings, residual paths, LayerNorm, attention, and feedforward computation through a Transformer block.
 
 ## 3. Required equipment and files
 
@@ -48,7 +50,7 @@ After completing the lab, students should be able to:
   - `requirements.txt`
   - `scripts/data.py`
   - `scripts/common.py`
-  - the five executable model/evaluation scripts
+  - the six executable model/evaluation scripts
 
 The scripts use MPS when `torch.backends.mps.is_available()` is true and CPU
 otherwise. MPS availability alone does not prove a script used MPS; each script
@@ -262,6 +264,51 @@ Create `evidence/results/summary.md`:
 positional embeddings would add that token embeddings and a causal mask do not
 fully provide.
 
+## Step 8 — Complete the minimal decoder-only GPT
+
+The article-driven progression ends with attention. This extension supplies the
+remaining decoder-only Transformer mechanisms:
+
+```text
+token embedding + position embedding
+        ↓
+pre-LayerNorm → causal multi-head attention → residual addition
+        ↓
+pre-LayerNorm → feedforward network → residual addition
+        ↓
+repeat block → final LayerNorm → vocabulary logits
+```
+
+### S8-T1 — Inspect the architecture
+
+```bash
+rg -n 'position_embedding|TransformerBlock|LayerNorm|FeedForward|projection|x = x \+' scripts/gpt_model.py
+```
+
+**S8-Q1:** What information does the positional embedding supply that token
+identity alone does not? Why does the causal mask restrict visibility without
+fully representing absolute token position?
+
+### S8-T2 — Train and evaluate the minimal GPT
+
+```bash
+python scripts/gpt_model.py | tee evidence/results/gpt-model.txt
+```
+
+Record its device, parameter count, configuration, averaged training loss,
+averaged validation loss, and validation perplexity.
+
+**S8-Q2:** Trace one block’s two residual paths. Why must the attention output
+projection and feedforward output both return width `N_EMBD` before their
+residual additions?
+
+### S8-T3 — Qualify the result
+
+**S8-Q3:** Does having all principal decoder-only Transformer components make
+this model comparable in capability to a production GPT? Discuss corpus size,
+tokenization, context length, embedding width, number of layers, training
+budget, and alignment.
+
 ## 4. Submission checklist
 
 Submit:
@@ -269,9 +316,9 @@ Submit:
 - `evidence/setup/environment.txt`
 - `evidence/setup/python-packages.txt`
 - `evidence/setup/data-check.txt`
-- Five files under `evidence/results/`
+- Six model-output files plus entropy and summary under `evidence/results/`
 - Completed `evidence/results/summary.md`
-- Answers S1-Q1 through S7-Q2
+- Answers S1-Q1 through S8-Q3
 
 Do not submit `.venv/`, model-provider credentials, or unrelated personal
 files.
