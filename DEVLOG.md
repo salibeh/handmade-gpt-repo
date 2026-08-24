@@ -291,3 +291,30 @@ All fetched Python sources compiled during development inspection. Full clean
 execution remains pending on the instructor host because the automation worker
 does not have PyTorch installed. No fabricated training evidence or completion
 claim was recorded.
+
+
+## 17. Step 5 validation-harness defect corrected
+
+The first full validation attempt on the instructor Mac appeared to hang. It
+was not a model or MPS failure: `validate_clean.py` captured child output while
+sequentially running six programs, five with 10,000 training steps. The
+instructor interrupted it safely; no child process or misleading
+`clean-full.json` remained.
+
+Static validation subsequently passed with PyTorch 2.8.0, MPS built, and MPS
+available. The repository was clean.
+
+The correction:
+
+- Preserves Apple MPS acceleration
+- Adds CUDA selection before MPS for Linux/NVIDIA hosts
+- Falls back to CPU
+- Streams each model's existing progress output
+- Announces the current script and elapsed time
+- Adds `--mode learning` (200 steps, 20 evaluation batches)
+- Retains `--mode evidence` (10,000 steps, 200 evaluation batches)
+- Permits documented step/evaluation overrides
+- Writes final JSON only after execution stops or completes
+
+Both modes use the same model code through environment-supplied run
+configuration, avoiding separate drifting implementations.
