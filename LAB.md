@@ -372,6 +372,21 @@ this model comparable in capability to a production GPT? Discuss corpus size,
 tokenization, context length, embedding width, number of layers, training
 budget, and alignment.
 
+## Clean-environment validation
+
+From a fresh clone, install `requirements.txt`, then run:
+
+```bash
+python scripts/validate_clean.py --output evidence/setup/clean-static.json
+python scripts/validate_clean.py --execute \
+  --output evidence/setup/clean-full.json
+```
+
+The first command verifies source, dataset, architecture markers, and PyTorch.
+Only the second executes every training stage. See
+[VALIDATION_REPORT.md](VALIDATION_REPORT.md). A static pass must not be
+reported as a full training pass.
+
 ## 4. Submission checklist
 
 Submit:
