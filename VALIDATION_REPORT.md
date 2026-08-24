@@ -33,8 +33,17 @@ training pass, and a learning-mode pass is not full evidence-mode validation.
 
 ## Current validation status
 
-Static validation passed on the instructor Mac with PyTorch 2.8.0 and MPS
-available. The original silent evidence run was interrupted safely and produced
-no `clean-full.json`. That run exposed the hidden-output/long-runtime defect
-corrected by the current harness. Learning and evidence execution remain to be
-recorded.
+All three validation levels passed on the instructor Apple Silicon Mac with
+PyTorch 2.8.0 and MPS selected:
+
+- [clean-static.json](evidence/setup/clean-static.json): static/runtime pass
+- [clean-learning.json](evidence/setup/clean-learning.json): six-stage,
+  200-step learning execution pass
+- [clean-full.json](evidence/setup/clean-full.json): six-stage, 10,000-step
+  evidence execution pass
+
+The full evidence run used 200 evaluation batches per split, completed every
+stage with return code 0, and took approximately 429.122 seconds. The evidence
+artifact was committed as `cd6f82f`. Model metrics and qualified analysis are
+recorded in [DEVLOG.md](DEVLOG.md). Multi-seed and accuracy work remains outside
+this clean-execution result.
