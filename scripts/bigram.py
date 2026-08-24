@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -8,7 +9,7 @@ from data import train_data, val_data, vocab_size
 SEED = 1337
 BATCH_SIZE = 32
 BLOCK_SIZE = 8
-TRAIN_STEPS = 10_000
+TRAIN_STEPS = int(os.getenv("HANDMADE_GPT_TRAIN_STEPS", "10000"))
 
 torch.manual_seed(SEED)
 device = select_device()
