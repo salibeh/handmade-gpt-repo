@@ -278,3 +278,16 @@ Reciprocal links were added to the Lab 0 baseline and dependency contract on
 the AI Enterprise course’s `course-redesign-v2` branch. This completes Step 4
 without activating Lab 0; implementation and clean-environment validation
 remain Step 5.
+
+
+## 16. Step 5 clean-validation harness
+
+Step 5 added `scripts/validate_clean.py` and `VALIDATION_REPORT.md`. The
+harness separates source/dataset/runtime checks from `--execute`, which runs
+every training stage. This prevents a successful static inspection from being
+reported as completed training.
+
+All fetched Python sources compiled during development inspection. Full clean
+execution remains pending on the instructor host because the automation worker
+does not have PyTorch installed. No fabricated training evidence or completion
+claim was recorded.
