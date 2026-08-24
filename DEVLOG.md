@@ -220,3 +220,38 @@ capability.
 5. Test longer context lengths and deeper/wider configurations.
 6. Add attention visualization and controlled head ablation.
 7. Select a repository license after reviewing source terms.
+
+
+## 14. Final practicum structure frozen
+
+Step 3 of the six-step integration plan created
+[HANDMADE_GPT_DESIGN_BASELINE.md](HANDMADE_GPT_DESIGN_BASELINE.md) as the
+authoritative design contract. It freezes a 17-section path from purpose and
+minimal applied mathematics through tokens, embeddings, training, bigram
+prediction, entropy, causal context, attention, positional information,
+complete Transformer blocks, sampling, repeatable evaluation, and a required
+student report.
+
+The practicum is classified as optional enrichment, honors work, graduate
+work, or instructor reference. This preserves the value of implementing model
+internals without making a lengthy from-scratch build a universal prerequisite.
+
+The baseline also separates:
+
+- Learning mode for rapid mechanism inspection
+- Evidence mode for multi-seed, machine-readable assessment
+- Architectural completeness from production capability
+- Implemented core models from pending instructional infrastructure
+
+The present lab covers the executable bigram-to-minimal-GPT path but is not
+declared complete. Missing work is explicitly recorded in the baseline and the
+coverage table in [LAB.md](LAB.md), including applied-math exercises, CLI
+modes, temperature experiments, accuracy metrics, multi-seed summaries, JSON
+evidence, diagrams, and the report template.
+
+The stable task convention is now
+`HGPT-S<section>-T<task>`/`HGPT-S<section>-Q<question>`. Existing shorter
+identifiers remain transitional until the associated sections are implemented.
+
+No external-foundations bridge or cross-repository dependency link was added
+in this step. That boundary is reserved for Step 4.
