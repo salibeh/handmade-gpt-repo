@@ -1,4 +1,4 @@
-# Development Log — Bigram to Causal Attention
+# Development Log — Bigram to a Minimal GPT
 
 This technical log records the construction and correction of a
 character-level language-model learning project on a MacBook Pro with Apple
@@ -14,14 +14,15 @@ is maintained in [SOURCES.md](SOURCES.md).
 
 ## 1. Scope decision
 
-The original repository called the endpoint “GPT From Scratch.” Audit found
-that the implementation stops at causal multi-head attention and lacks
-positional embeddings, feedforward sublayers, residual connections, LayerNorm,
-and stacked Transformer blocks. The project is therefore now described as
-“bigram to causal attention.” A complete GPT remains future work.
+The original repository called its multi-head-attention endpoint “GPT From
+Scratch.” Audit found that this stage lacked positional embeddings,
+feedforward sublayers, residual connections, LayerNorm, and stacked Transformer
+blocks. It was relabeled as the article-aligned attention endpoint.
 
-This terminology correction is not cosmetic: students should be able to name
-which mechanism each result actually demonstrates.
+A subsequent implementation, `scripts/gpt_model.py`, now adds those missing
+decoder-only Transformer mechanisms. The repository may accurately call that
+new endpoint a minimal GPT architecture while continuing to distinguish it
+from the earlier attention-only model and from production-scale GPT systems.
 
 ## 2. Initial environment and dataset
 
@@ -191,19 +192,31 @@ The public technical record retains only the general security lesson: never
 place tokens in chat, source files, remote URLs, evidence, or committed shell
 transcripts. Use a configured GitHub integration or credential manager.
 
-## 12. Open work
+## 12. Minimal GPT extension completed
 
-The next architecture milestone is a minimal decoder-only Transformer block:
+`scripts/gpt_model.py` adds:
 
-1. Add positional embeddings.
-2. Add an attention output projection.
-3. Add residual connections.
-4. Add pre-normalization.
-5. Add a per-position feedforward network.
-6. Stack blocks.
-7. Evaluate across multiple seeds.
-8. Save checkpoints and machine-readable metrics.
-9. Select a repository license after reviewing source terms.
+1. Learned token embeddings
+2. Learned absolute positional embeddings
+3. Scaled causal multi-head self-attention
+4. An attention output projection
+5. Pre-LayerNorm residual attention paths
+6. A four-times-expanded GELU feedforward sublayer
+7. Pre-LayerNorm residual feedforward paths
+8. Two stacked Transformer blocks
+9. Final LayerNorm and vocabulary projection
+10. Autoregressive generation with context cropping
 
-Only after those mechanisms are present should the implementation be labeled a
-small GPT architecture.
+The model uses an eight-token context to preserve continuity with earlier
+stages. Architecture completeness at this scale does not imply strong language
+capability.
+
+## 13. Remaining work
+
+1. Execute all corrected scripts on the target Apple Silicon host.
+2. Replace historical last-batch numbers with averaged validation results.
+3. Repeat controlled comparisons across multiple seeds.
+4. Save machine-readable metrics and checkpoints.
+5. Test longer context lengths and deeper/wider configurations.
+6. Add attention visualization and controlled head ablation.
+7. Select a repository license after reviewing source terms.
