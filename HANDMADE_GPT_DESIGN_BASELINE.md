@@ -346,7 +346,8 @@ Secrets and complete virtual environments must not be committed.
 | JSON metrics | Pending |
 | Architecture diagrams | Pending |
 | Report template | Pending |
-| Clean-clone execution validation | Pending |
+| Clean-clone validation harness | Implemented in Step 5 |
+| Full clean-clone execution evidence | Pending instructor host |
 | Repository license decision | Pending owner decision |
 | External-foundations bridge | Implemented in Step 4 |
 
@@ -393,3 +394,16 @@ Step 3 of the six-step integration plan is complete when:
 Step 4 is complete: the short external-foundations bridge and reciprocal
 cross-repository links are present. The practicum remains optional and does not
 replace Lab 0 competency gates.
+
+
+## 13. Step 5 validation record
+
+Step 5 added `scripts/validate_clean.py` and
+[VALIDATION_REPORT.md](VALIDATION_REPORT.md). The harness checks the dataset,
+compiles all scripts, verifies core architecture markers and PyTorch
+availability, and can execute every training stage with `--execute`.
+
+Development inspection confirmed source compilation, but full clean-clone
+training remains pending because the automation worker does not contain the
+pinned PyTorch runtime. This baseline therefore remains partially implemented;
+the validation harness is not evidence that every completion gate passed.
