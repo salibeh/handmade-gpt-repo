@@ -1,9 +1,12 @@
 import math
+import os
 
 import torch
 
 
 def select_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
     if torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
@@ -17,7 +20,9 @@ def make_batch(data, block_size, batch_size, device):
 
 
 @torch.no_grad()
-def estimate_losses(model, batch_fn, eval_iters=200):
+def estimate_losses(model, batch_fn, eval_iters=None):
+    if eval_iters is None:
+        eval_iters = int(os.getenv("HANDMADE_GPT_EVAL_ITERS", "200"))
     was_training = model.training
     model.eval()
     result = {}
