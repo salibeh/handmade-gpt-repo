@@ -396,3 +396,52 @@ remain excluded.
 Before committing evidence, the instructor must still inspect it, scan for
 secrets, validate JSON, and stage explicit paths. Being technically trackable
 does not make every generated artifact appropriate for version control.
+
+
+## 20. Step 5 full evidence-mode execution passed on Apple MPS
+
+The instructor executed the complete evidence configuration:
+
+```bash
+python scripts/validate_clean.py --execute --mode evidence \
+  --output evidence/setup/clean-full.json
+```
+
+The run used PyTorch 2.8.0 with Apple MPS selected, 10,000 training steps per
+trainable model, 200 evaluation batches per split, seed 1337, and a 1,800-second
+per-script timeout. Dataset size, compilation, architecture-marker, and runtime
+checks all passed. Every executable stage returned code 0.
+
+| Stage | Averaged train loss | Averaged validation loss | Validation perplexity | Elapsed |
+|---|---:|---:|---:|---:|
+| Bigram | 2.4623 | 2.4912 | 12.0760 | 33.236 s |
+| Empirical bigram entropy | 2.4519 nats | 2.3735 nats | Not applicable | 4.839 s |
+| Uniform context | 2.8062 | 2.8298 | 16.9419 | 41.243 s |
+| Single-head attention | 2.4237 | 2.4538 | 11.6329 | 59.201 s |
+| Multi-head attention | 2.2900 | 2.3612 | 10.6037 | 124.739 s |
+| Minimal GPT | 1.8634 | 1.9946 | 7.3491 | 165.864 s |
+
+Total recorded stage time was approximately 429.122 seconds, or 7 minutes
+9.122 seconds. The final JSON reported `status: pass` and
+`scope: evidence-execution`.
+
+For this seed and configuration:
+
+- The fitted bigram training loss was close to empirical training bigram
+  entropy, differing by approximately 0.0104 nats.
+- Uniform causal averaging performed worse than the bigram on held-out loss,
+  confirming the intended negative result for this run.
+- Single-head attention slightly improved on the bigram validation loss.
+- Multi-head attention improved further.
+- The complete minimal GPT produced the lowest observed validation loss and
+  perplexity.
+- Minimal-GPT generated text was visibly more structured than the 200-step
+  learning output, but qualitative appearance remains diagnostic evidence, not
+  an aggregate correctness metric.
+
+These results validate full clean execution of the current script sequence on
+the instructor Mac. They do not establish cross-seed or cross-platform
+generalization, distinct interpretable roles for attention heads, or
+production-level language capability. Multi-seed metrics, accuracy measures,
+temperature experiments, structured model-result JSON, and the full student
+report remain separate baseline work.
