@@ -338,8 +338,8 @@ Secrets and complete virtual environments must not be committed.
 | Positional embeddings | Implemented in `gpt_model.py` |
 | Complete minimal Transformer blocks | Implemented in `gpt_model.py` |
 | MPS/CPU device selection | Implemented |
-| CUDA device selection | Pending |
-| Command-line learning/evidence modes | Pending |
+| CUDA/MPS/CPU device selection | Implemented |
+| Command-line learning/evidence validation modes | Implemented |
 | Greedy and temperature experiments | Pending |
 | Top-1/top-3 aggregate accuracy | Pending |
 | Multi-seed runner | Pending |
@@ -398,10 +398,12 @@ replace Lab 0 competency gates.
 
 ## 13. Step 5 validation record
 
-Step 5 added `scripts/validate_clean.py` and
-[VALIDATION_REPORT.md](VALIDATION_REPORT.md). The harness checks the dataset,
-compiles all scripts, verifies core architecture markers and PyTorch
-availability, and can execute every training stage with `--execute`.
+Step 5 added and then corrected `scripts/validate_clean.py` and
+[VALIDATION_REPORT.md](VALIDATION_REPORT.md). The harness checks the dataset, compiles all scripts, verifies core
+architecture markers and PyTorch availability, and executes every stage with
+visible progress. Learning mode uses 200 training steps and 20 evaluation
+batches; evidence mode preserves 10,000 steps and 200 batches. Device selection
+uses CUDA, then Apple MPS, then CPU.
 
 Development inspection confirmed source compilation, but full clean-clone
 training remains pending because the automation worker does not contain the
