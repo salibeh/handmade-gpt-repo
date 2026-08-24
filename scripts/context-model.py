@@ -1,60 +1,71 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from data import vocab_size, train_data, val_data
 
-torch.manual_seed(1337)
-batch_size = 32
-block_size = 8
-n_embd = 32
-head_size = 16
+from common import make_batch, print_evaluation, select_device
+from data import train_data, val_data, vocab_size
+
+SEED = 1337
+BATCH_SIZE = 32
+BLOCK_SIZE = 8
+N_EMBD = 32
+HEAD_SIZE = 16
+TRAIN_STEPS = 10_000
+
+torch.manual_seed(SEED)
+device = select_device()
+
 
 def get_batch(split):
-    data = train_data if split == 'train' else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([data[i:i+block_size] for i in ix])
-    y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    return x, y
+    source = train_data if split == "train" else val_data
+    return make_batch(source, BLOCK_SIZE, BATCH_SIZE, device)
 
-token_embedding_table = nn.Embedding(vocab_size, n_embd)
-key   = nn.Linear(n_embd, head_size, bias=False)
-query = nn.Linear(n_embd, head_size, bias=False)
-value = nn.Linear(n_embd, head_size, bias=False)
-lm_head = nn.Linear(head_size, vocab_size)
 
-tril = torch.tril(torch.ones(block_size, block_size))
+class SingleHeadAttentionModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, N_EMBD)
+        self.key = nn.Linear(N_EMBD, HEAD_SIZE, bias=False)
+        self.query = nn.Linear(N_EMBD, HEAD_SIZE, bias=False)
+        self.value = nn.Linear(N_EMBD, HEAD_SIZE, bias=False)
+        self.lm_head = nn.Linear(HEAD_SIZE, vocab_size)
+        self.register_buffer(
+            "causal_mask", torch.tril(torch.ones(BLOCK_SIZE, BLOCK_SIZE))
+        )
 
-optimizer = torch.optim.AdamW(
-    list(token_embedding_table.parameters()) +
-    list(key.parameters()) +
-    list(query.parameters()) +
-    list(value.parameters()) +
-    list(lm_head.parameters()),
-    lr=1e-3
-)
+    def forward(self, idx, targets=None):
+        x = self.token_embedding(idx)
+        key = self.key(x)
+        query = self.query(x)
+        value = self.value(x)
 
-for step in range(10000):
-    xb, yb = get_batch('train')
+        weights = query @ key.transpose(-2, -1) * HEAD_SIZE**-0.5
+        time = idx.shape[1]
+        weights = weights.masked_fill(
+            self.causal_mask[:time, :time] == 0, float("-inf")
+        )
+        weights = F.softmax(weights, dim=-1)
 
-    x = token_embedding_table(xb)
-    k = key(x)
-    q = query(x)
-    v = value(x)
+        logits = self.lm_head(weights @ value)
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(
+                logits.reshape(-1, vocab_size), targets.reshape(-1)
+            )
+        return logits, loss
 
-    wei = q @ k.transpose(-2, -1) * head_size ** -0.5
-    wei = wei.masked_fill(tril == 0, float('-inf'))
-    wei = F.softmax(wei, dim=-1)
 
-    out = wei @ v
-    logits = lm_head(out)
-    loss = F.cross_entropy(logits.view(-1, vocab_size), yb.view(-1))
+model = SingleHeadAttentionModel().to(device)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 
+print(f"device: {device}")
+for step in range(TRAIN_STEPS):
+    xb, yb = get_batch("train")
+    _, loss = model(xb, yb)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
-
     if step % 1000 == 0:
-        print(f"step {step}: loss {loss.item():.4f}")
+        print(f"step {step}: training-batch loss {loss.item():.4f}")
 
-print(f"final loss: {loss.item():.4f}")
-print(f"final perplexity: {torch.exp(loss).item():.4f}")
+print_evaluation(model, get_batch)
