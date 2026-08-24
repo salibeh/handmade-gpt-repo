@@ -16,9 +16,19 @@ minimal decoder-only GPT extension with positional embeddings, projected
 multi-head causal attention, residual connections, pre-LayerNorm,
 feedforward sublayers, and stacked Transformer blocks.
 
+- [HANDMADE_GPT_DESIGN_BASELINE.md](HANDMADE_GPT_DESIGN_BASELINE.md): authoritative scope, sequence, outcomes, artifacts, and completion gates
 - [LAB.md](LAB.md): student-facing execution, evidence, and reasoning tasks
 - [DEVLOG.md](DEVLOG.md): focused technical development history
 - [SOURCES.md](SOURCES.md): article, dataset, and attribution record
+
+## Implementation status
+
+The final 17-section instructional structure is frozen in the design baseline.
+The core bigram-to-minimal-GPT execution path is implemented, including
+positional embeddings and complete Transformer blocks. Evidence-mode
+automation, multi-seed metrics, diagrams, and the required report remain
+pending. The external-foundations bridge is reserved for Step 4 and is not yet
+part of this repository.
 
 ## Quick start
 
