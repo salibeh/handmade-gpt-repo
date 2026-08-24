@@ -445,3 +445,23 @@ generalization, distinct interpretable roles for attention heads, or
 production-level language capability. Multi-seed metrics, accuracy measures,
 temperature experiments, structured model-result JSON, and the full student
 report remain separate baseline work.
+
+
+## 21. Full evidence artifact committed
+
+The reviewed `evidence/setup/clean-full.json` artifact passed JSON validation
+and a secret-pattern scan, then was committed and pushed as `cd6f82f`. GitHub
+verification confirmed:
+
+- `status: pass`
+- `scope: evidence-execution`
+- 10,000 training steps
+- 200 evaluation batches per split
+- Six execution records
+- No nonzero return codes
+- PyTorch 2.8.0 with MPS selected
+- No API-key pattern
+
+This closes the Handmade GPT clean-execution activity within Integration Step
+5. It does not close the practicum's remaining multi-seed, accuracy,
+temperature, diagram, report, or license completion gates.
