@@ -34,7 +34,7 @@ core, but they do not yet constitute the complete frozen practicum.
 | 13. Stacked minimal GPT | Step 8 | Implemented |
 | 14. Logits, softmax, temperature, sampling | Generation only | Partial |
 | 15. Evaluation and repeatability | Averaged loss/perplexity | Partial |
-| 16. External-foundations boundary | Reserved for integration Step 4 | Deferred |
+| 16. External-foundations boundary | Section immediately below | Implemented |
 | 17. Required report | No report template yet | Pending |
 
 Remaining work includes complete applied-math exercises, explicit
@@ -48,8 +48,30 @@ sections are implemented, all student work must be normalized to the frozen
 `HGPT-S<section>-T<task>` and `HGPT-S<section>-Q<question>` convention.
 Questions must remain adjacent to the task that produces their evidence.
 
-The short external-foundations boundary and any cross-repository links are
-explicitly outside Step 3 and remain deferred to Step 4.
+### External-foundations bridge
+
+This practicum explains how representations are learned and used inside a
+small language model. The AI Enterprise course’s
+[Lab 0 Foundations Baseline](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_FOUNDATIONS_BASELINE.md)
+uses pretrained services to teach a different operational boundary:
+
+| This practicum | AI Enterprise Lab 0 |
+|---|---|
+| Character tokenization and token IDs | Text, tokens, request context, and inference |
+| Internal token embeddings | Internal token embeddings versus retrieval embeddings |
+| Training, loss, and parameter updates | Training-versus-inference distinction; no training required |
+| Attention and positional embeddings | Observable generation behavior |
+| Minimal Transformer blocks | Retrieval, RAG, agent, MCP, and service-stack boundaries |
+| Model evaluation | Execution evidence versus semantic correctness |
+
+Handmade GPT is optional enrichment. It neither replaces Lab 0 nor satisfies
+Lab 0’s vector-retrieval, RAG, MCP, architecture, or evidence gates. Students
+preparing for AI Enterprise should complete Lab 0 or its approved
+equivalent-competency check. See the
+[Lab 0 → Lab 1 dependency contract](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_LAB1_DEPENDENCY_CONTRACT.md).
+
+This bridge is deliberately conceptual; it adds no vector database, RAG,
+agent, or MCP implementation to the Handmade GPT practicum.
 
 ## 1. Purpose and architecture boundary
 
