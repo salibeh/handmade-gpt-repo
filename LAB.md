@@ -1,339 +1,285 @@
-# Lab: Building a Character-Level GPT From Scratch (macOS, Apple Silicon)
+# Lab — From Bigram Prediction to Causal Attention
 
-A hands-on, reproducible lab for building up from a bigram model to
-multi-head self-attention, with each step measured against a theoretical
-baseline rather than taken on faith. Written for macOS on Apple Silicon
-(M1/M2/M3), but the code is portable.
+**Source-driven origin:** This lab was initiated by Nikhil Bajpai’s Medium
+article, [“I Built a GPT From Scratch on a MacBook — Days 1–5: From a Bigram
+to a Working Self-Attention
+Head”](https://medium.com/@nikhil.cse16/i-built-a-gpt-from-scratch-on-a-macbook-days-1-5-from-a-bigram-to-a-working-self-attention-head-0d3082ac417c).
+The lab independently executes, measures, and qualifies the article’s
+bigram-to-attention progression. See [SOURCES.md](SOURCES.md).
 
-## Prerequisites
+> No evidence, no credit. A script completing is execution evidence; it is not
+> proof that one architecture generalizes better than another.
 
-- macOS with Python 3.9+ (`python3 --version` to check)
-- ~500MB free disk space (PyTorch + dependencies + dataset)
-- Terminal access
+## 1. Purpose and architecture boundary
 
-## 0. Environment setup
+This lab opens the language-model “black box” by constructing increasingly
+capable next-character predictors. Students first observe what a one-character
+bigram model can learn, calculate its empirical information limit, deliberately
+try a weak way of using more context, and then replace fixed context weights
+with learned causal attention.
+
+The last stage is not yet a complete GPT. It has causal multi-head attention
+but lacks positional embeddings, feedforward sublayers, residual connections,
+LayerNorm, and stacked Transformer blocks. Calling that endpoint a complete GPT
+would hide the exact mechanisms still missing.
+
+## 2. Learning objectives
+
+After completing the lab, students should be able to:
+
+1. Explain token IDs, learned embeddings, logits, cross-entropy, and perplexity.
+2. Distinguish batch size from context length.
+3. Calculate the empirical conditional entropy of a character bigram corpus.
+4. Explain why one random training-batch loss is not an evaluation.
+5. Compare averaged training and held-out validation loss.
+6. Implement causal context aggregation using a lower-triangular mask.
+7. Explain the distinct Query, Key, and Value roles.
+8. Trace tensor shapes through single-head and multi-head attention.
+9. Interpret a negative experimental result without treating it as failure.
+10. State why the final attention model is not yet a complete GPT.
+
+## 3. Required equipment and files
+
+- macOS Apple Silicon or another host with Python 3.9+
+- Approximately 2 GB free disk recommended for the environment and artifacts
+- Git and Internet access for the initial clone
+- Repository files:
+  - `input.txt`
+  - `requirements.txt`
+  - `scripts/data.py`
+  - `scripts/common.py`
+  - the five executable model/evaluation scripts
+
+The scripts use MPS when `torch.backends.mps.is_available()` is true and CPU
+otherwise. MPS availability alone does not prove a script used MPS; each script
+prints its selected device.
+
+## Step 1 — Establish a reproducible environment
+
+This step creates an isolated environment, verifies the dataset, and captures
+the execution platform before model results are generated.
+
+### S1-T1 — Clone and inspect the repository
 
 ```bash
-mkdir handmade-gpt && cd handmade-gpt
-python3 -m venv venv
-source venv/bin/activate
-
-pip install torch
-pip install numpy   # required — pip install torch does not always pull this in
+git clone https://github.com/salibeh/handmade-gpt-repo.git
+cd handmade-gpt-repo
+git status
+find scripts -maxdepth 1 -type f -print | sort
 ```
 
-Verify Apple Silicon GPU (MPS / Metal) support:
+**S1-Q1:** Which command proves the repository was cloned cleanly, and which
+command merely lists files? Explain why these are different evidence claims.
+
+### S1-T2 — Create the Python environment
 
 ```bash
-python3 -c "import torch; print(torch.backends.mps.is_available()); print(torch.backends.mps.is_built())"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+mkdir -p evidence/setup
+python -m pip freeze | tee evidence/setup/python-packages.txt
 ```
 
-Both should print `True`. `is_available()` being `True` means PyTorch can
-place tensors on the M-series GPU cores (via `.to('mps')`) instead of only
-the CPU — meaningfully faster for the matrix multiplications a neural net
-does constantly. This lab's scripts are small enough to run fine on CPU too;
-MPS becomes more valuable once you scale up embedding size, depth, or batch
-size.
+**S1-Q2:** Why is `.venv/` excluded from Git while
+`requirements.txt` is retained?
 
-### `.gitignore` (set this up *before* your first commit if using git)
+### S1-T3 — Verify host, device capability, and dataset
 
 ```bash
-cat > .gitignore << 'EOF'
-venv/
-__pycache__/
-*.pyc
-EOF
+{
+  sw_vers 2>/dev/null || true
+  uname -a
+  python --version
+  python -c "import torch; print('torch', torch.__version__); print('mps_available', torch.backends.mps.is_available())"
+  wc -c input.txt
+} | tee evidence/setup/environment.txt
 ```
 
-Committing `venv/` accidentally will blow past GitHub's 100MB single-file
-limit (PyTorch's compiled libraries are 100-200MB+) — if this has already
-happened and a push was rejected, the clean fix for a fresh repo is:
-`rm -rf .git`, recreate `.gitignore`, then `git init` again from scratch,
-rather than trying to surgically remove the file from existing history.
+The dataset size must be `1115394` bytes.
 
-## 1. Get the dataset
+**S1-Q3:** Does `mps_available True` prove training ran on MPS? Identify the
+additional evidence required.
+
+## Step 2 — Inspect the data pipeline
+
+The dataset is converted from characters to integer token IDs. The IDs are
+lookup keys, not semantic values. A learned embedding table later maps each ID
+to trainable numbers.
+
+### S2-T1 — Verify path-independent data loading
 
 ```bash
-curl -o input.txt https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
+python -c "from scripts.data import DATASET_PATH, vocab_size, train_data, val_data; print(DATASET_PATH); print(vocab_size, len(train_data), len(val_data))" \
+  | tee evidence/setup/data-check.txt
+(cd scripts && python -c "from data import DATASET_PATH; print(DATASET_PATH)")
 ```
 
-Confirm: `wc -c input.txt` should show `1115394`.
+Expected values are vocabulary 65, training length 1,003,854, and validation
+length 111,540.
 
-## 2. Shared data module — `scripts/data.py`
+**S2-Q1:** Why did the earlier `open("input.txt")` implementation fail when
+the process ran from `scripts/`, and how does `Path(__file__)` fix it?
 
-All other scripts import from this rather than duplicating the setup.
-Each `.py` file is its own blank slate — variables from a previous
-interactive session or a different script do **not** carry over. This
-module exists specifically because of a real debugging episode: early
-versions of this lab kept the setup code copy-pasted at the top of each
-script, which produced repeated `NameError: name 'vocab_size' is not
-defined` (and similar) errors whenever a new script was started without
-its own copy of the setup. Extracting it once into `data.py` and importing
-from it fixes this permanently — and avoids a worse trap: importing
-directly from a *training* script (e.g. `from bigram import train_data`)
-would re-run that script's entire training loop as a side effect, since
-`import` executes a file top-to-bottom. `data.py` deliberately contains
-**only** setup, no training, so it's always safe to import from.
+### S2-T2 — Trace a shifted training example
 
-```python
-import torch
-
-with open('input.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
-
-chars = sorted(set(text))
-vocab_size = len(chars)
-stoi = {ch: i for i, ch in enumerate(chars)}
-itos = {i: ch for i, ch in enumerate(chars)}
-encode = lambda s: [stoi[c] for c in s]
-decode = lambda l: ''.join([itos[i] for i in l])
-
-data = torch.tensor(encode(text), dtype=torch.long)
-n = int(0.9 * len(data))
-train_data = data[:n]
-val_data = data[n:]
+```bash
+python - <<'PY'
+from scripts.data import decode, train_data
+block = train_data[:8]
+target = train_data[1:9]
+print("x:", repr(decode(block.tolist())))
+print("y:", repr(decode(target.tolist())))
+for index in range(len(block)):
+    print(index, repr(decode(block[:index+1].tolist())), "->", repr(decode([target[index].item()])))
+PY
 ```
 
-Sanity check: `vocab_size` should be `65`; `len(train_data)` /
-`len(val_data)` should be `1003854` / `111540`.
+**S2-Q2:** How can one block of eight positions provide eight next-character
+prediction targets without becoming eight independent sequences?
 
-## 3. Bigram baseline — `scripts/bigram.py`
+## Step 3 — Build and evaluate the bigram baseline
 
-The simplest possible model: predicts the next character using only the
-current character (one row of a 65×65 lookup table).
+The bigram model uses only the current character to predict the next one.
+Periodic losses show optimization progress; the final comparison uses averaged
+training and validation loss.
 
-```python
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
-from data import vocab_size, train_data, val_data
+### S3-T1 — Train and capture the bigram result
 
-torch.manual_seed(1337)
-batch_size = 32
-block_size = 8
-
-def get_batch(split):
-    data = train_data if split == 'train' else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([data[i:i+block_size] for i in ix])
-    y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    return x, y
-
-class BigramLanguageModel(nn.Module):
-    def __init__(self, vocab_size):
-        super().__init__()
-        self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
-
-    def forward(self, idx, targets=None):
-        logits = self.token_embedding_table(idx)
-        loss = None
-        if targets is not None:
-            B, T, C = logits.shape
-            loss = F.cross_entropy(logits.view(B*T, C), targets.view(B*T))
-        return logits, loss
-
-model = BigramLanguageModel(vocab_size)
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-
-for step in range(10000):
-    xb, yb = get_batch('train')
-    logits, loss = model(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-    if step % 1000 == 0:
-        print(f"step {step}: loss {loss.item():.4f}")
-
-print(f"final loss: {loss.item():.4f}")
-print(f"final perplexity: {torch.exp(loss).item():.4f}")
+```bash
+mkdir -p evidence/results
+python scripts/bigram.py | tee evidence/results/bigram.txt
 ```
 
-**Expect:** final loss ≈ 2.45, perplexity ≈ 11.5-11.6, plateauing hard after
-roughly step 5000 — the model has converged to its structural ceiling.
+**S3-Q1:** Identify the selected device, averaged training loss, averaged
+validation loss, and validation perplexity. Why is the periodic
+`training-batch loss` unsuitable for the final comparison?
 
-### Note on `batch_size`
+### S3-T2 — Calculate empirical bigram entropy
 
-`block_size = 8` is fixed context length. `batch_size` is worth
-understanding, not just copying: a small batch (e.g. 4) is useful for
-*inspecting* what a batch actually contains — small enough to decode and
-read by hand. For actual *training*, a larger batch (32 here) gives a
-smoother, less noisy gradient estimate per step, and keeps more of the
-GPU's parallel cores busy per step (a batch of 4 leaves most of an M1's
-GPU capacity idle). Larger still (64, 128...) can help further but with
-diminishing returns and rising memory cost — there's no single "correct"
-value, it's a tunable hyperparameter, chosen here for consistency with the
-source article. Also worth knowing: `get_batch()` reads `batch_size` from
-the enclosing scope each time it's *called*, not from when it was
-*defined* — so changing `batch_size` between an inspection run and a
-training run, in the same script, works correctly as intended.
-
-## 4. Verify the ceiling is real — `scripts/loss-limit.py`
-
-Computes the theoretical minimum loss directly from real character-pair
-statistics (conditional entropy), independent of any trained model. This
-confirms whether the bigram's plateau is a training limitation or a genuine
-information limitation.
-
-```python
-from data import vocab_size, train_data
-from collections import Counter
-import math
-
-pairs = Counter()
-counts = Counter()
-for i in range(len(train_data) - 1):
-    c1 = train_data[i].item()
-    c2 = train_data[i+1].item()
-    pairs[(c1, c2)] += 1
-    counts[c1] += 1
-
-total_entropy = 0.0
-total_count = sum(counts.values())
-
-for c1 in counts:
-    c1_count = counts[c1]
-    entropy_c1 = 0.0
-    for c2 in range(vocab_size):
-        p = pairs.get((c1, c2), 0) / c1_count
-        if p > 0:
-            entropy_c1 -= p * math.log(p)
-    weight = c1_count / total_count
-    total_entropy += weight * entropy_c1
-
-print(f"Theoretical minimum loss (entropy floor): {total_entropy:.4f}")
+```bash
+python scripts/loss-limit.py | tee evidence/results/entropy.txt
 ```
 
-**Expect:** ≈ 2.4519 — matching the trained bigram's loss almost exactly.
-This is the core empirical checkpoint of the whole lab: it proves the
-bigram isn't undertrained, it's *information-limited* — one character of
-context genuinely cannot resolve more uncertainty than this, no matter how
-long you train.
+**S3-Q2:** Compare empirical training entropy with averaged training loss.
+Why should neither be compared with one random batch? Why can validation
+entropy and validation model loss differ?
 
-## 5. Context via uniform averaging (deliberately a negative result)
+## Step 4 — Test a deliberately weak use of additional context
 
-Build the causal running-average mechanism (`tril`/`wei` matrix multiply)
-and wire it into a full model exactly like the bigram, but blending up to
-8 characters of context with **equal weight** per position, via
-`nn.Linear(n_embd, vocab_size)` bridging the blended context vector to 65
-logits.
+Uniform causal averaging gives every available prior position equal weight.
+This is a controlled negative design: it tests whether “more context” is
+automatically helpful.
 
-**Expect:** final loss ≈ 2.86, *worse* than the bigram. This is intentional
-and instructive — uniform weighting dilutes useful nearby signal with
-irrelevant distant signal. It directly motivates the next step.
+### S4-T1 — Train the uniform-context model
 
-## 6. Single self-attention head — `scripts/context-model.py`
-
-Replace uniform weights with **learned, content-dependent** weights via
-Query/Key/Value projections:
-
-```python
-head_size = 16
-key   = nn.Linear(n_embd, head_size, bias=False)
-query = nn.Linear(n_embd, head_size, bias=False)
-value = nn.Linear(n_embd, head_size, bias=False)
-
-k, q, v = key(x), query(x), value(x)
-wei = q @ k.transpose(-2, -1) * head_size ** -0.5
-wei = wei.masked_fill(tril == 0, float('-inf'))   # causal mask
-wei = F.softmax(wei, dim=-1)
-out = wei @ v
+```bash
+python scripts/uniform-context-model.py | tee evidence/results/uniform-context.txt
 ```
 
-Bridge `out` (16-dim) to 65 logits via `nn.Linear(head_size, vocab_size)`,
-train end-to-end.
+**S4-Q1:** Did averaged validation loss improve over the bigram run? State only
+what this run supports. Do not claim the result will hold for every seed,
+dataset, context length, or optimizer.
 
-**Expect:** final loss ≈ 2.44 — a small win over the bigram, and a clear
-win over uniform averaging, using the same 8-token context window.
+### S4-T2 — Explain the causal averaging matrix
 
-## 7. Multi-head attention — `scripts/multi-head-model.py`
+For a four-position example, write the normalized lower-triangular weight
+matrix by hand.
 
-Refactor into reusable classes; run several attention heads in parallel and
-concatenate their outputs.
+**S4-Q2:** Why does a lower-triangular matrix prevent future-token access, and
+why can equal weighting still discard useful distinctions among allowed
+tokens?
 
-```python
-class Head(nn.Module):
-    def __init__(self, head_size):
-        super().__init__()
-        self.key = nn.Linear(n_embd, head_size, bias=False)
-        self.query = nn.Linear(n_embd, head_size, bias=False)
-        self.value = nn.Linear(n_embd, head_size, bias=False)
-        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+## Step 5 — Replace fixed weights with one learned attention head
 
-    def forward(self, x):
-        B, T, C = x.shape
-        k, q, v = self.key(x), self.query(x), self.value(x)
-        wei = q @ k.transpose(-2, -1) * k.shape[-1] ** -0.5
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
-        wei = F.softmax(wei, dim=-1)
-        return wei @ v
+Query and Key projections determine relevance; Value supplies the payload
+combined according to those learned relevance weights.
 
-class MultiHeadAttention(nn.Module):
-    def __init__(self, num_heads, head_size):
-        super().__init__()
-        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+### S5-T1 — Train the single-head model
 
-    def forward(self, x):
-        return torch.cat([h(x) for h in self.heads], dim=-1)
+```bash
+python scripts/context-model.py | tee evidence/results/single-head.txt
 ```
 
-Wrap in a full `SimpleGPT(nn.Module)` (embedding → `MultiHeadAttention` →
-`lm_head`), train the same way via `model.parameters()`.
+**S5-Q1:** Record the averaged validation result. Does one run establish that
+attention always beats a bigram? What additional repetitions would support a
+broader claim?
 
-**Expect:** final loss ≈ 2.25, perplexity ≈ 9.5 — the clearest improvement
-in the whole lab. Multiple independently-learned relevance patterns capture
-more useful structure than any single pattern alone.
+### S5-T2 — Trace attention tensor shapes
 
-## 8. Generation
+Using batch 32, time 8, embedding width 32, and head width 16, determine the
+shapes of `x`, `key`, `query`, the attention-score matrix, `value`, and
+the head output.
 
-```python
-def generate(model, idx, max_new_tokens, block_size):
-    for _ in range(max_new_tokens):
-        idx_cond = idx[:, -block_size:]
-        logits, _ = model(idx_cond)
-        logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim=-1)
-        idx_next = torch.multinomial(probs, num_samples=1)
-        idx = torch.cat((idx, idx_next), dim=1)
-    return idx
+**S5-Q2:** Why are Query and Key insufficient by themselves to provide a
+separate retrieved payload?
+
+## Step 6 — Run causal multi-head attention
+
+Four heads learn independent projections and concatenate four eight-value head
+outputs. The result returns to embedding width 32.
+
+### S6-T1 — Train and inspect the multi-head model
+
+```bash
+python scripts/multi_head_model.py | tee evidence/results/multi-head.txt
 ```
 
-Cropping to the last `block_size` tokens each step is required — the model
-was only ever trained on fixed-length context and will error on longer
-input otherwise.
+**S6-Q1:** Compare its averaged validation loss with the other three models.
+Does a lower loss prove that each head learned a different interpretable
+linguistic function? Explain.
 
-**Expect:** English-shaped but largely incoherent output at this
-architectural depth. This is expected, not a bug — residual connections,
-LayerNorm, and a feedforward MLP (not yet built in this lab) are what push
-output toward genuine coherence.
+### S6-T2 — Separate examples from aggregate evidence
 
-## 9. Verification: inspect real predictions, don't just trust the loss number
+The script prints generated text and an illustrative top-three prediction
+trace after the averaged evaluation.
 
-Run the trained multi-head model against a real (held-out) validation
-snippet and print top-3 predicted next-characters with probabilities at
-each position, alongside the actual next character. Look for: high
-confidence at genuinely predictable transitions, categorically-sensible
-misses (vowel-for-vowel, letter-for-letter), and appropriately low
-confidence at ambiguous points. This is a more convincing, checkable
-demonstration of real learned structure than eyeballing generated text.
+**S6-Q2:** Why are selected top-three predictions and “English-shaped” output
+weaker evidence than an aggregate held-out metric? What can they still reveal
+that one aggregate number cannot?
 
-## Results checkpoint table
+## Step 7 — Form a qualified conclusion
 
-| Model                      | Context             | Final loss | Perplexity |
-|-----------------------------|----------------------|-----------:|-----------:|
-| Bigram                      | 1 character          | ~2.4488    | ~11.57     |
-| Uniform averaging            | 8 chars, equal weight| ~2.8604    | ~17.47     |
-| Single self-attention head   | 8 chars, learned wt  | ~2.4439    | ~11.52     |
-| 4-head multi-head attention  | 8 chars, 4 patterns  | ~2.2479    | ~9.47      |
-| Entropy floor (computed)     | 1 character (theory) | 2.4519     | —          |
+### S7-T1 — Build the evidence table
 
-Exact numbers will vary slightly run-to-run due to random initialization
-and batch sampling, but the *ordering* (uniform < bigram < single-head <
-multi-head) should reproduce consistently.
+Create `evidence/results/summary.md`:
 
-## Next steps (not covered in this lab)
+| Model | Device | Averaged train loss | Averaged validation loss | Validation perplexity |
+|---|---|---:|---:|---:|
+| Bigram | | | | |
+| Uniform context | | | | |
+| Single head | | | | |
+| Multi-head | | | | |
 
-- Residual connections: `x = x + sublayer(x)`
-- LayerNorm before each sublayer
-- Feedforward MLP after attention, per position
-- Stacking multiple transformer blocks
-- Scaling up `n_embd`, `block_size`, training steps
+**S7-Q1:** Which observed ordering is supported by this seed? Distinguish
+“observed in this execution” from “expected to generalize.”
+
+### S7-T2 — State the architecture boundary
+
+**S7-Q2:** List the missing components that prevent
+`multi_head_model.py` from being called a complete GPT. Explain what
+positional embeddings would add that token embeddings and a causal mask do not
+fully provide.
+
+## 4. Submission checklist
+
+Submit:
+
+- `evidence/setup/environment.txt`
+- `evidence/setup/python-packages.txt`
+- `evidence/setup/data-check.txt`
+- Five files under `evidence/results/`
+- Completed `evidence/results/summary.md`
+- Answers S1-Q1 through S7-Q2
+
+Do not submit `.venv/`, model-provider credentials, or unrelated personal
+files.
+
+## 5. Historical results notice
+
+Earlier repository versions recorded approximate losses of 2.4488, 2.8604,
+2.4439, and 2.2479 from the final sampled training batch. Those values motivated
+the project but are not retained as validated comparison results. Rerun the
+corrected scripts and use averaged validation measurements before publishing a
+new results table.
