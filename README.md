@@ -19,6 +19,7 @@ feedforward sublayers, and stacked Transformer blocks.
 - [HANDMADE_GPT_DESIGN_BASELINE.md](HANDMADE_GPT_DESIGN_BASELINE.md): authoritative scope, sequence, outcomes, artifacts, and completion gates
 - [LAB.md](LAB.md): student-facing execution, evidence, and reasoning tasks
 - [DEVLOG.md](DEVLOG.md): focused technical development history
+- [VALIDATION_REPORT.md](VALIDATION_REPORT.md): clean-check commands and validation boundary
 - [SOURCES.md](SOURCES.md): article, dataset, and attribution record
 
 ## Implementation status
@@ -72,6 +73,18 @@ Every training script:
 - Reports validation perplexity
 
 Do not compare models using the last randomly sampled training batch.
+
+## Clean-check validation
+
+After a clean clone and dependency installation:
+
+```bash
+python scripts/validate_clean.py --output evidence/setup/clean-static.json
+python scripts/validate_clean.py --execute --output evidence/setup/clean-full.json
+```
+
+The first check does not prove training completed. The `--execute` result is
+the full clean-runtime artifact.
 
 ## Architecture boundary
 
