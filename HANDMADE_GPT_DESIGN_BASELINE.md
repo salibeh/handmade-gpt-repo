@@ -12,9 +12,11 @@ This document is authoritative for the practicum’s scope, sequence, learning
 outcomes, artifacts, and completion criteria. [LAB.md](LAB.md) contains the
 student procedures. [DEVLOG.md](DEVLOG.md) records implementation history.
 
-This practicum is not a required prerequisite for any other course merely
-because this baseline exists. Cross-repository links and the short foundations
-bridge are deliberately deferred to Step 4 of the six-step integration plan.
+This practicum is not a required prerequisite for the AI Enterprise course.
+The required enterprise preparation is defined by the
+[Lab 0 Foundations Baseline](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_FOUNDATIONS_BASELINE.md) and its
+[Lab 0 → Lab 1 dependency contract](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_LAB1_DEPENDENCY_CONTRACT.md).
+The short boundary in Section 16 preserves that distinction.
 
 ## 2. Purpose
 
@@ -206,8 +208,16 @@ Machine-readable JSON is the canonical metrics artifact.
 
 ### Section 16 — External-foundations boundary
 
-Reserved for Step 4. It will contain only a short boundary and link. It must
-not add RAG, vector-store, agent, or MCP implementation to this practicum.
+This practicum provides optional depth in learned token representations,
+training, attention, positional embeddings, and Transformer blocks. AI
+Enterprise Lab 0 provides required breadth in pretrained inference, retrieval
+embeddings, vector comparison, RAG, agents, MCP, and evidence discipline.
+
+Completion of Handmade GPT does not replace Lab 0 or waive its competency
+gates. The practicum links to the
+[Lab 0 Foundations Baseline](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_FOUNDATIONS_BASELINE.md) and
+[dependency contract](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_LAB1_DEPENDENCY_CONTRACT.md) but does not add RAG, vector-store,
+agent, or MCP implementation.
 
 ### Section 17 — Required report
 
@@ -338,7 +348,7 @@ Secrets and complete virtual environments must not be committed.
 | Report template | Pending |
 | Clean-clone execution validation | Pending |
 | Repository license decision | Pending owner decision |
-| External-foundations bridge | Deferred to Step 4 |
+| External-foundations bridge | Implemented in Step 4 |
 
 ## 10. Completion gates
 
@@ -380,5 +390,6 @@ Step 3 of the six-step integration plan is complete when:
 - DEVLOG records the structure decision
 - All references are independently re-fetched
 
-Step 4—the short external-foundations bridge and cross-repository links—has not
-yet been performed.
+Step 4 is complete: the short external-foundations bridge and reciprocal
+cross-repository links are present. The practicum remains optional and does not
+replace Lab 0 competency gates.
