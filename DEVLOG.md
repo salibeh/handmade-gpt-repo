@@ -373,3 +373,26 @@ used as final model comparisons. In particular, the 200-step bigram loss is far
 above the empirical conditional entropy because learning mode deliberately
 stops early. Full evidence-mode execution at 10,000 steps and 200 evaluation
 batches remains pending.
+
+
+## 19. Instructor evidence-retention policy corrected
+
+The repository originally ignored the entire `evidence/` tree. That was too
+broad for an instructor playground and conflicted with the baseline's canonical
+artifact contract.
+
+The ignore policy now permits reviewed, compact artifacts under:
+
+- `evidence/setup/`
+- `evidence/results/`
+- `evidence/sampling/`
+
+This allows static, learning-mode, and evidence-mode validation JSON—as well as
+reviewed summaries and sampling comparisons—to be versioned deliberately.
+Ad hoc evidence remains ignored by default. Virtual environments, environment
+files, PyTorch model/checkpoint formats, Python caches, and `checkpoints/`
+remain excluded.
+
+Before committing evidence, the instructor must still inspect it, scan for
+secrets, validate JSON, and stage explicit paths. Being technically trackable
+does not make every generated artifact appropriate for version control.
