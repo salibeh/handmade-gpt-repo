@@ -63,7 +63,17 @@ Confirm: `wc -c input.txt` should show `1115394`.
 
 All other scripts import from this rather than duplicating the setup.
 Each `.py` file is its own blank slate — variables from a previous
-interactive session or a different script do **not** carry over.
+interactive session or a different script do **not** carry over. This
+module exists specifically because of a real debugging episode: early
+versions of this lab kept the setup code copy-pasted at the top of each
+script, which produced repeated `NameError: name 'vocab_size' is not
+defined` (and similar) errors whenever a new script was started without
+its own copy of the setup. Extracting it once into `data.py` and importing
+from it fixes this permanently — and avoids a worse trap: importing
+directly from a *training* script (e.g. `from bigram import train_data`)
+would re-run that script's entire training loop as a side effect, since
+`import` executes a file top-to-bottom. `data.py` deliberately contains
+**only** setup, no training, so it's always safe to import from.
 
 ```python
 import torch
@@ -140,6 +150,22 @@ print(f"final perplexity: {torch.exp(loss).item():.4f}")
 
 **Expect:** final loss ≈ 2.45, perplexity ≈ 11.5-11.6, plateauing hard after
 roughly step 5000 — the model has converged to its structural ceiling.
+
+### Note on `batch_size`
+
+`block_size = 8` is fixed context length. `batch_size` is worth
+understanding, not just copying: a small batch (e.g. 4) is useful for
+*inspecting* what a batch actually contains — small enough to decode and
+read by hand. For actual *training*, a larger batch (32 here) gives a
+smoother, less noisy gradient estimate per step, and keeps more of the
+GPU's parallel cores busy per step (a batch of 4 leaves most of an M1's
+GPU capacity idle). Larger still (64, 128...) can help further but with
+diminishing returns and rising memory cost — there's no single "correct"
+value, it's a tunable hyperparameter, chosen here for consistency with the
+source article. Also worth knowing: `get_batch()` reads `batch_size` from
+the enclosing scope each time it's *called*, not from when it was
+*defined* — so changing `batch_size` between an inspection run and a
+training run, in the same script, works correctly as intended.
 
 ## 4. Verify the ceiling is real — `scripts/loss-limit.py`
 
