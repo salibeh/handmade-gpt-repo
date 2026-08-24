@@ -1,4 +1,4 @@
-# From Bigram Prediction to Causal Attention
+# From Bigram Prediction to a Minimal GPT
 
 A character-level language-model learning project inspired by Nikhil Bajpai’s
 Medium article, [“I Built a GPT From Scratch on a MacBook — Days 1–5: From a
@@ -8,12 +8,13 @@ Head”](https://medium.com/@nikhil.cse16/i-built-a-gpt-from-scratch-on-a-macboo
 The project reconstructs the progression:
 
 ```text
-bigram → uniform causal context → one attention head → multi-head attention
+bigram → uniform causal context → one attention head → multi-head attention → decoder-only Transformer
 ```
 
-It deliberately stops short of calling the final model a complete GPT.
-Positional embeddings, feedforward layers, residual connections, LayerNorm,
-and stacked Transformer blocks remain future work.
+The article-driven stages stop at attention. This repository now adds a
+minimal decoder-only GPT extension with positional embeddings, projected
+multi-head causal attention, residual connections, pre-LayerNorm,
+feedforward sublayers, and stacked Transformer blocks.
 
 - [LAB.md](LAB.md): student-facing execution, evidence, and reasoning tasks
 - [DEVLOG.md](DEVLOG.md): focused technical development history
@@ -35,6 +36,7 @@ python scripts/loss-limit.py
 python scripts/uniform-context-model.py
 python scripts/context-model.py
 python scripts/multi_head_model.py
+python scripts/gpt_model.py
 ```
 
 The dataset check should report 1,115,394 bytes.
@@ -48,11 +50,14 @@ Every training script:
 
 Do not compare models using the last randomly sampled training batch.
 
-## Current model boundary
+## Architecture boundary
 
-The final implementation contains causal multi-head attention but no positional
-encoding or complete Transformer block. It is therefore an attention-based
-character language model, not yet a full GPT implementation.
+`scripts/multi_head_model.py` is the article-aligned attention endpoint and
+is not a complete GPT. `scripts/gpt_model.py` is the repository’s subsequent
+minimal GPT extension. It is decoder-only and structurally complete for this
+teaching scale, but remains a tiny character model with an eight-token context,
+two blocks, and a small corpus; architecture completeness does not imply
+frontier-model capability.
 
 ## Reproducibility
 
