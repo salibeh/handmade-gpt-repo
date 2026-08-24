@@ -378,12 +378,16 @@ From a fresh clone, install `requirements.txt`, then run:
 
 ```bash
 python scripts/validate_clean.py --output evidence/setup/clean-static.json
-python scripts/validate_clean.py --execute \
+python scripts/validate_clean.py --execute --mode learning \
+  --output evidence/setup/clean-learning.json
+python scripts/validate_clean.py --execute --mode evidence \
   --output evidence/setup/clean-full.json
 ```
 
 The first command verifies source, dataset, architecture markers, and PyTorch.
-Only the second executes every training stage. See
+Learning mode executes every stage with 200 training steps and 20 evaluation
+batches per split. Evidence mode executes the full 10,000 steps and 200
+batches. Both display progress and use CUDA, then MPS, then CPU. See
 [VALIDATION_REPORT.md](VALIDATION_REPORT.md). A static pass must not be
 reported as a full training pass.
 
