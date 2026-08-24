@@ -255,3 +255,26 @@ identifiers remain transitional until the associated sections are implemented.
 
 No external-foundations bridge or cross-repository dependency link was added
 in this step. That boundary is reserved for Step 4.
+
+
+## 15. External-foundations bridge added
+
+Step 4 added a deliberately short bridge to the AI Enterprise course’s
+[Lab 0 Foundations Baseline](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_FOUNDATIONS_BASELINE.md) and
+[Lab 0 → Lab 1 dependency contract](https://github.com/salibeh/ai-enterprise-course/blob/course-redesign-v2/documentation/LAB0_LAB1_DEPENDENCY_CONTRACT.md).
+
+The integration preserves two distinct purposes:
+
+- Handmade GPT: optional depth in training, loss, internal token embeddings,
+  attention, positional embeddings, and Transformer blocks
+- AI Enterprise Lab 0: required breadth in pretrained inference, retrieval
+  embeddings, vector similarity, RAG, agents, MCP, and evidence boundaries
+
+Handmade GPT completion does not waive Lab 0. It does not independently satisfy
+Lab 0’s retrieval, RAG, MCP, architecture, or evidence gates. No RAG,
+vector-store, agent, or MCP implementation was added to this repository.
+
+Reciprocal links were added to the Lab 0 baseline and dependency contract on
+the AI Enterprise course’s `course-redesign-v2` branch. This completes Step 4
+without activating Lab 0; implementation and clean-environment validation
+remain Step 5.
