@@ -1,0 +1,114 @@
+{
+  "status": "pass",
+  "scope": "evidence-execution",
+  "configuration": {
+    "train_steps": 10000,
+    "eval_iters": 200,
+    "timeout_per_script": 1800
+  },
+  "checks": [
+    {
+      "check": "dataset-size",
+      "pass": true,
+      "observed": 1115394
+    },
+    {
+      "check": "compile:data.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:common.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:bigram.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:loss-limit.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:uniform-context-model.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:context-model.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:multi_head_model.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "compile:gpt_model.py",
+      "pass": true,
+      "detail": "compiled"
+    },
+    {
+      "check": "architecture:gpt_model.py",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "check": "architecture:context-model.py",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "check": "architecture:multi_head_model.py",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "check": "torch-runtime",
+      "pass": true,
+      "detail": {
+        "installed": true,
+        "version": "2.8.0",
+        "cuda": false,
+        "mps": true,
+        "selected": "mps"
+      }
+    }
+  ],
+  "executions": [
+    {
+      "script": "bigram.py",
+      "returncode": 0,
+      "elapsed_seconds": 33.236
+    },
+    {
+      "script": "loss-limit.py",
+      "returncode": 0,
+      "elapsed_seconds": 4.839
+    },
+    {
+      "script": "uniform-context-model.py",
+      "returncode": 0,
+      "elapsed_seconds": 41.243
+    },
+    {
+      "script": "context-model.py",
+      "returncode": 0,
+      "elapsed_seconds": 59.201
+    },
+    {
+      "script": "multi_head_model.py",
+      "returncode": 0,
+      "elapsed_seconds": 124.739
+    },
+    {
+      "script": "gpt_model.py",
+      "returncode": 0,
+      "elapsed_seconds": 165.864
+    }
+  ]
+}
