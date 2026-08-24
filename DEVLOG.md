@@ -318,3 +318,58 @@ The correction:
 
 Both modes use the same model code through environment-supplied run
 configuration, avoiding separate drifting implementations.
+
+
+## 18. Step 5 learning-mode execution passed on Apple MPS
+
+The corrected validation harness was executed from the instructor's clean
+working tree on the Apple Silicon Mac:
+
+```bash
+python scripts/validate_clean.py --execute --mode learning \
+  --output evidence/setup/clean-learning.json
+```
+
+Environment and configuration:
+
+- PyTorch: 2.8.0
+- Selected device: `mps`
+- CUDA available: false
+- MPS available: true
+- Training steps per trainable model: 200
+- Evaluation batches per split: 20
+- Timeout per script: 1,800 seconds
+- Dataset size: 1,115,394 bytes
+
+All source-compilation, dataset, architecture-marker, and PyTorch-runtime checks
+passed. All six executable stages returned code 0:
+
+| Stage | Averaged train loss | Averaged validation loss | Validation perplexity | Elapsed |
+|---|---:|---:|---:|---:|
+| Bigram | 4.4914 | 4.4938 | 89.4651 | 4.573 s |
+| Empirical bigram entropy | 2.4519 nats | 2.3735 nats | Not applicable | 4.785 s |
+| Uniform context | 3.2700 | 3.2759 | 26.4674 | 4.390 s |
+| Single-head attention | 3.1051 | 3.1263 | 22.7897 | 4.627 s |
+| Multi-head attention | 2.8590 | 2.8582 | 17.4307 | 14.548 s |
+| Minimal GPT | 2.6979 | 2.7087 | 15.0099 | 13.810 s |
+
+Total recorded stage time was approximately 46.733 seconds. The resulting JSON
+reported:
+
+- `status: pass`
+- `scope: learning-execution`
+- Six execution records
+- No failed static/runtime checks
+
+The multi-head and minimal-GPT stages also completed generation, and the
+multi-head stage printed its illustrative top-three trace. The generated text
+remained largely incoherent, which is expected after only 200 optimization
+steps and is useful evidence that successful execution and architectural
+completeness do not imply language quality.
+
+These measurements validate the rapid learning-mode path and the corrected MPS
+execution/progress behavior. They must not replace evidence-mode results or be
+used as final model comparisons. In particular, the 200-step bigram loss is far
+above the empirical conditional entropy because learning mode deliberately
+stops early. Full evidence-mode execution at 10,000 steps and 200 evaluation
+batches remains pending.
