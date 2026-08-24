@@ -1,433 +1,209 @@
-# Development Log — GPT From Scratch
+# Development Log — Bigram to Causal Attention
 
-A comprehensive record of building a character-level GPT from the ground up
-on a MacBook Pro (M1, 16GB) — not just the modeling results, but the real
-debugging, engineering decisions, and conceptual detours that were part of
-actually doing this.
+This technical log records the construction and correction of a
+character-level language-model learning project on a MacBook Pro with Apple
+Silicon. The effort was driven by Nikhil Bajpai’s Medium article,
+[“I Built a GPT From Scratch on a MacBook — Days 1–5: From a Bigram to a
+Working Self-Attention
+Head”](https://medium.com/@nikhil.cse16/i-built-a-gpt-from-scratch-on-a-macbook-days-1-5-from-a-bigram-to-a-working-self-attention-head-0d3082ac417c),
+published June 28, 2026.
 
-Reference article: *"I Built a GPT from Scratch on a MacBook: Days 1-5, from
-a Bigram to a Working Self-Attention Head"* by Nikhil. This log covers
-everything actually done in the process — including where it diverged from,
-extended past, or hit friction not covered by the source article.
+The article supplies the pedagogical progression. This repository independently
+reproduces, measures, extends, and corrects the implementation. Full attribution
+is maintained in [SOURCES.md](SOURCES.md).
 
----
+## 1. Scope decision
 
-## Environment setup
+The original repository called the endpoint “GPT From Scratch.” Audit found
+that the implementation stops at causal multi-head attention and lacks
+positional embeddings, feedforward sublayers, residual connections, LayerNorm,
+and stacked Transformer blocks. The project is therefore now described as
+“bigram to causal attention.” A complete GPT remains future work.
 
-- MacBook Pro, Apple M1, 16GB unified memory, macOS 13.2
-- Python 3.9.6, venv
-- PyTorch with MPS (Metal) backend confirmed available and built:
-  `torch.backends.mps.is_available()` → `True`, `torch.backends.mps.is_built()`
-  → `True`. This means PyTorch can place tensors on the M1's GPU cores
-  (`.to('mps')`) instead of only CPU — relevant for speed once models scale
-  up, though these scripts are small enough to run fine on CPU too.
+This terminology correction is not cosmetic: students should be able to name
+which mechanism each result actually demonstrates.
 
-### Debugging encountered: missing numpy dependency
+## 2. Initial environment and dataset
 
-`import torch` produced:
+The initial work used a MacBook Pro M1 with 16 GB unified memory, macOS 13.2,
+Python 3.9.6, and PyTorch. The Tiny Shakespeare corpus contains 1,115,394
+characters and produces a 65-character vocabulary.
+
+A missing-NumPy warning after installing PyTorch demonstrated that successful
+package installation does not prove a usable environment. The corrected
+repository now pins PyTorch and NumPy in `requirements.txt` and requires an
+actual import/device check.
+
+## 3. Data-module extraction
+
+Early scripts assumed variables from an interactive Python session would remain
+available in later processes. They do not: each script begins with a new
+interpreter state. Importing a training script to reuse data would also execute
+its training loop as an import side effect.
+
+Shared corpus preparation was therefore extracted into `scripts/data.py`,
+which contains no training. Audit later found a second defect: it opened
+`input.txt` relative to the process working directory, while the README told
+users to run from `scripts/` and keep the dataset in the repository root.
+
+Correction: `data.py` now resolves the dataset relative to its own file:
+
+```python
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATASET_PATH = REPO_ROOT / "input.txt"
 ```
-UserWarning: Failed to initialize NumPy: No module named 'numpy'
+
+The scripts can now run from the repository root or from `scripts/`.
+
+## 4. Bigram baseline and empirical entropy
+
+The bigram model uses a `vocab_size × vocab_size` embedding table. For each
+current-character ID, its selected row directly supplies the logits for the
+next character.
+
+An independent frequency calculation estimates empirical conditional entropy:
+
+```text
+H(next | current) = -Σ P(current) Σ P(next | current) ln P(next | current)
 ```
-`pip install torch` did not pull in `numpy` as a hard dependency in this
-environment, even though PyTorch uses it internally for some tensor
-conversions. Fixed with `pip install numpy`. Lesson: a clean `pip install
-torch` is not guaranteed to be a complete working environment — verify by
-actually importing and exercising the library, not just installing it.
 
----
+The initial project observed empirical training entropy near 2.4519 nats and a
+last-batch training loss near 2.4488. This was a useful clue but was described
+too strongly as proof that optimization reached the entropy floor.
 
-## Day 1 — Data pipeline
+Audit correction:
 
-- Downloaded tiny Shakespeare (`input.txt`), confirmed length matches the
-  source article exactly: 1,115,394 characters.
-- Built character-level vocabulary via `sorted(set(text))`: `vocab_size = 65`.
-  Reasoned through *why* character-level (not word-level) is the easier
-  starting point before being told: vocabulary size directly determines
-  the size of the first embedding table (`vocab_size × vocab_size` for the
-  bigram model) — ~65×65 (4,225 numbers) vs. 10,000+×10,000+ for word-level,
-  a difference of orders of magnitude, unrelated to model "quality," purely
-  about keeping the mechanism small enough to reason about by hand.
-- Built `stoi`/`itos` and `encode`/`decode`; verified round-trip correctness
-  by hand (`encode("hello") == [46, 43, 50, 50, 53]`, decodes back to
-  "hello").
-- Converted full text to a tensor of integers; split 90/10 into
-  `train_data` / `val_data`, **preserving original order** — explicitly
-  reasoned through why: shuffling characters before splitting would destroy
-  the sequential structure a language model depends on (it predicts *next*
-  given *previous*; frequency alone, decoupled from order, isn't the target).
-- Built `get_batch(split)`: randomly samples `batch_size` starting positions,
-  slices `block_size`-length chunks. `y` is `x` shifted by one character.
-  Traced this by hand on real decoded batch content (e.g. `xb[1]` = "for
-  that", `yb[1]` = "or that ") to directly verify the shift mechanism,
-  rather than trusting the code from the shape alone.
+- One random batch is not comparable with a whole-corpus statistic.
+- Training entropy and held-out validation performance answer different
+  questions.
+- AdamW regularization and finite optimization affect the fitted model.
+- The corrected scripts average 200 training and 200 validation batches.
+- `loss-limit.py` reports empirical train and validation entropy separately.
 
-### Debugging encountered: variables not persisting across scripts
+The appropriate claim is that empirical training entropy estimates the
+unregularized bigram optimum for the observed training distribution; averaged
+measurements are needed to determine how closely training approached it.
 
-Hit repeated `NameError: name 'vocab_size' is not defined` and
-`NameError: name 'xb' is not defined` when moving from interactive `python3`
-sessions to standalone `.py` scripts. Root cause understood explicitly:
-each `.py` file execution is its own blank slate — variables from a prior
-interactive session, or from a *different* script file, do not carry over.
-Also hit a case where importing a training script (`bigram.py`) to reuse
-its `train_data` would have re-run its entire 10,000-step training loop as
-a side effect of `import` executing the whole file top-to-bottom — this
-was caught and avoided *before* being run, by reasoning through what
-`import` actually does.
+## 5. Batch size and context length
 
-**Fix, and a real engineering decision made as a result:** extracted the
-shared setup (reading text, building vocab, encoding, splitting data) into
-a standalone `data.py` module. Every other script imports from it
-(`from data import vocab_size, train_data, val_data, ...`), so the
-expensive/duplicated setup logic runs once, cleanly, without re-triggering
-unrelated training loops.
+`block_size=8` controls the maximum context in each sampled sequence.
+`batch_size=32` controls how many sequences contribute to one optimizer step.
+A larger batch generally reduces gradient-estimate noise but increases memory
+use.
 
-## Batching parameters — batch_size and block_size reasoning
+The original log also argued that batch 32 used the M1 GPU more effectively.
+Audit found that no tensor or model was moved to MPS, so the scripts actually
+ran on CPU. That hardware claim was unsupported by the implementation.
 
-- `block_size = 8`: how many characters of context a single training
-  example spans.
-- `batch_size`: initially set to `4` for *inspection* purposes (small
-  enough to manually decode and trace by hand, e.g. tracing `xb[0]`,
-  `xb[1]` back to real words). Later increased to `32` for actual
-  *training*.
-- **Explicit reasoning for why 32, not 4, for training:** a small batch
-  (4 sequences × 8 positions = 32 individual predictions) gives a noisy,
-  less representative gradient estimate at each step. A larger batch (32
-  sequences × 8 = 256 predictions) gives a smoother, more reliable gradient
-  direction per step. There's also a hardware angle: the M1 GPU is built
-  for parallel work, and a batch of 4 leaves most of that parallel capacity
-  idle — same "wasted parallelism" issue the source article raises when
-  explaining why RNNs (inherently sequential) lose to attention (fully
-  parallelizable) on GPU hardware.
-- **Why not 64 or higher:** reasoned through the tradeoffs rather than
-  picking a number arbitrarily — bigger batches use more memory (a real
-  constraint on 16GB unified memory once models get deeper), and give
-  diminishing returns on gradient smoothness past a certain point (32 → 64
-  helps much less than 4 → 32 did). 32 was kept for consistency with the
-  source article, explicitly noted as a tunable hyperparameter, not a fixed
-  rule.
-- Also explicitly worked through a Python-scoping gotcha: `get_batch()`
-  reads `batch_size` from the enclosing scope *at call time*, not at
-  function-definition time — so reassigning `batch_size = 32` after
-  `get_batch` is defined, but before it's called in the training loop,
-  correctly changes what every subsequent call uses. This was verified by
-  reasoning it through explicitly, not just observed as a side effect.
+Correction: `scripts/common.py` selects MPS when available and moves batches
+to the selected device; every model is also moved to that device and prints it.
+Batch-size effects on utilization remain hypotheses unless measured.
 
-## Day 2 — Bigram baseline
+## 6. Uniform-context negative result
 
-- Built `BigramLanguageModel`: single `nn.Embedding(vocab_size, vocab_size)`
-  — each character's row directly *is* its 65 next-character logits.
-- **Manually traced what `nn.Embedding` returns**, distinguishing the
-  integer `xb` value (a fixed, meaningless lookup key/ID — analogous to a
-  student ID number) from the embedding vector it retrieves (the actual
-  learned content — analogous to a school directory profile). Explicitly
-  worked through where that "content" originates: pure random
-  initialization at first, then reshaped by `loss.backward()` +
-  `optimizer.step()` over many training steps, based purely on what
-  reduces prediction error across the real training data — no information
-  is hand-coded in.
-- Untrained loss ≈ 5.04 (single noisy batch); theoretical untrained
-  baseline for uniform random guessing over 65 classes is
-  `-ln(1/65) ≈ 4.174`. Discussed *why* a single-batch loss reading (5.04)
-  can land above the theoretical untrained baseline — small-sample noise,
-  same idea as why averaging over many batches (later, `estimate_loss`-
-  style evaluation) gives a more trustworthy reading than any one batch.
-- Trained 10,000 steps, AdamW, `lr=1e-3`, `batch_size=32`. Final loss
-  converged to **2.4488**, perplexity ≈ **11.57**.
+The uniform model replaces one-character prediction with a normalized
+lower-triangular average of all available token embeddings. The causal mask
+prevents future-token access, but the weights cannot distinguish relevant from
+irrelevant allowed positions.
 
-### Independent verification: computing the entropy floor from real data
+The original run produced a worse final sampled-batch loss than the bigram.
+This remains an instructive negative result, but the corrected interpretation
+is limited to the tested configuration and must use averaged validation loss.
+It does not prove that uniform aggregation is universally worse.
 
-- Computed the **theoretical entropy floor** directly from real
-  character-pair statistics in `train_data` — a from-scratch conditional
-  entropy calculation (`-Σ P(c2|c1) log P(c2|c1)`, weighted by `P(c1)`),
-  completely independent of the trained model, using only counted
-  frequencies.
-- Hit a real bug running this standalone (`loss-limit.py`): same
-  "variables don't persist across scripts" issue as above, fixed the same
-  way, via the shared `data.py` import.
-- Result: **2.4519** — matches the trained bigram loss (2.4488) almost
-  exactly.
-- **This was treated as a genuine empirical checkpoint, not a formula to
-  accept on faith** — the explicit conclusion drawn: the bigram model's
-  loss floor is not a training deficiency (more steps/tuning would not
-  meaningfully improve it), but a real information-theoretic limit — one
-  character of context genuinely cannot resolve more uncertainty than
-  this, no matter how good the model gets.
+## 7. Single-head causal attention
 
-## Day 4 — Context via uniform averaging (deliberate negative result)
+The single-head model applies learned Query, Key, and Value projections:
 
-- Built the causal running-average trick (`xbow`) two ways and proved them
-  numerically identical:
-  1. **Double for-loop**, direct slicing (`x[b, :t+1]`) and `.mean(0)`.
-     Traced by hand against real printed tensor values before running
-     code, confirming e.g. `xbow[0][1] = [-0.0894, -0.4926]` matches
-     manual arithmetic on `x[0]`'s first two rows.
-  2. **Matrix multiply form**: `tril = torch.tril(torch.ones(T,T))`,
-     `wei = tril / tril.sum(1, keepdim=True)`, `xbow2 = wei @ x`.
-     Confirmed via `torch.allclose(xbow, xbow2, atol=1e-6)` → `True`
-     — with explicit discussion of what `atol` means (floating-point
-     arithmetic doesn't guarantee bit-identical results across different
-     computational paths to the same mathematical answer; `1e-6` tolerance
-     absorbs harmless rounding noise, not a real discrepancy).
-- **Explicit conceptual grounding built before wiring this into a real
-  model**: worked through, via a "students in a row holding number-cards"
-  analogy, precisely what each of `position`, `vector`, `embedding`,
-  `sequence`, `batch`, and `channels (C)` represents, and how `xbow`
-  differs from `x` (isolated per-position data vs. context-blended data).
-  Also explicitly worked through, and self-corrected via Socratic
-  back-and-forth, the actual relationship between `get_batch` (selection
-  of raw integer chunks — no math) and the embedding table (converts
-  those integers into vectors — a separate, later step) — this distinction
-  was initially conflated and had to be untangled across several turns.
-- Wired the uniform-average mechanism into a real, trainable model:
-  embedding → uniform-weighted average over up to 8 characters of context
-  → `nn.Linear(n_embd, vocab_size)` bridging the blended context vector to
-  65 logits → cross-entropy loss. Explicit discussion of *why* this bridge
-  layer is needed at all (blended vector is `n_embd`-dimensional, e.g. 32;
-  cross-entropy needs exactly `vocab_size`, 65, scores — a learned,
-  differentiable projection is required to connect the two, as opposed to
-  a naive idea like "just repeat the 16/32 numbers to fill 65 slots,"
-  which was explicitly proposed, tested against reasoning, and rejected:
-  repetition has no adjustable parameters and no way to represent that
-  different specific characters have independently different likelihoods).
-- Trained 10,000 steps. Final loss **2.8604**, perplexity ≈ **17.47** —
-  *worse* than the 1-character bigram (2.4488). **This result was
-  predicted before running the code**, based on reasoning that uniform
-  averaging can't distinguish relevant recent context from irrelevant
-  distant context, and diluting the former with the latter should hurt
-  more than help. The prediction was confirmed, not just observed after
-  the fact.
+- Query represents what the current position seeks.
+- Key represents how each allowed position can be matched.
+- Value provides the payload combined after relevance scoring.
 
-## Day 5 — Single-head self-attention
+Scaled dot-product scores are causally masked, normalized by softmax, and used
+to blend Value vectors. A learned output layer maps the head result to
+next-character logits.
 
-- Added `Key`, `Query`, `Value` as three separate `nn.Linear(n_embd,
-  head_size, bias=False)` projections of the same embedding, grounded in
-  the search-engine analogy from the source article (Query = "what am I
-  looking for," Key = "what do I advertise about myself," Value = "what do
-  I actually hand over").
-- Explicitly reasoned through **why three roles specifically, not two or
-  four**: two (Query/Key only) would let you compute relevance scores but
-  leaves nothing separate to retrieve as payload; conflating Key and Value
-  into one thing (or reusing the raw embedding for everything) forces
-  "what makes me findable" and "what I contribute" to be identical,
-  and forces relevance to be symmetric (`x[t]·x[s] = x[s]·x[t]`), which is
-  unrealistic (a word caring about another word isn't necessarily
-  reciprocal). "More heads" (the eventual multi-head extension) means more
-  parallel *copies* of this same three-role unit, not a fourth role within
-  one unit.
-- Explicitly reasoned through **where the actual "information gain" comes
-  from**: not from the Q/K/V linear transformation itself at any single
-  forward pass (which, on randomly-initialized weights, adds no new
-  information — a repeat/copy operation and a random linear projection are
-  equally "meaningless" at initialization). The real gain comes from
-  training: gradient descent shapes the three projections, over many
-  steps on real data, to extract and encode statistical regularities from
-  the *entire training corpus* — compressed into the weight matrices —
-  which is not present in any single input's raw embedding.
-- `wei = q @ k.transpose(-2,-1) * head_size**-0.5` (scaled dot-product;
-  scaling explicitly connected to preventing softmax saturation — if
-  raw scores get too large/spread, softmax pushes nearly all probability
-  onto one option, killing the gradient signal for adjusting the rest).
-- Causal mask via `tril`: future positions set to `-inf` before softmax.
-- `out = softmax(wei) @ v` — blends **Values**, weighted by learned Q·K
-  relevance.
-- Bridged `out` (16-dim) to 65 logits via `nn.Linear(head_size,
-  vocab_size)`, trained end-to-end (embedding + K/Q/V + output head jointly).
-- Trained 10,000 steps. Final loss **2.4439**, perplexity ≈ **11.52** — a
-  small but real improvement over the bigram (2.4488), and a clear
-  improvement over uniform averaging (2.8604), using the identical 8-token
-  context window uniform averaging had access to. **Explicitly connected
-  this result back to entropy/information theory**: learned,
-  content-dependent weighting lets the model pull in only the genuinely
-  predictive context for a given situation (e.g., weighting "c" and "i"
-  heavily when predicting the next letter of "city," and down-weighting
-  irrelevant distant characters) rather than being forced into fixed,
-  input-independent proportions — which is precisely what a lower loss
-  (lower cross-entropy, i.e., less remaining uncertainty) means.
+Randomly initialized parameters contain numeric variation but no learned
+corpus-specific organization. Corpus-derived predictive structure emerges only
+through optimization. This replaces the imprecise earlier statement that
+random parameters contain “no information.”
 
-## Multi-head attention (extension beyond the source article)
+## 8. Multi-head extension
 
-- Refactored single-head logic into a reusable `Head(nn.Module)` class,
-  added `MultiHeadAttention` running `n_head=4` heads in parallel
-  (`head_size = n_embd // n_head = 8` each), concatenating outputs back to
-  `n_embd=32`. Predicted the concatenated output shape (`(B, T, 32)`)
-  correctly before running, reasoning from "4 heads × 8 numbers each,
-  concatenated along the last dimension."
-- Reorganized the whole model into a proper `nn.Module` (`SimpleGPT`),
-  trained via `model.parameters()` rather than manually listing tensors —
-  an explicit code-quality improvement, not just a numerical experiment.
-- Trained 10,000 steps. Final loss **2.2479**, perplexity ≈ **9.47** — the
-  clearest improvement in the whole progression.
+The project extended beyond the article’s single-head endpoint by creating four
+parallel attention heads and concatenating their outputs. The canonical file is
+now `scripts/multi_head_model.py`; the inconsistent
+`scripts/4-context-model.py` name was retired.
 
-### Results summary
+A lower validation loss would establish better predictive performance for the
+tested run. It would not, by itself, prove that every head learned a distinct,
+human-interpretable linguistic role. Attention inspection or controlled
+ablation would be required for that claim.
 
-| Model                      | Context           | Final loss | Perplexity |
-|-----------------------------|--------------------|-----------:|-----------:|
-| Bigram                      | 1 character        | 2.4488     | ~11.57     |
-| Uniform averaging            | 8 chars, equal wt  | 2.8604     | ~17.47     |
-| Single self-attention head   | 8 chars, learned wt| 2.4439     | ~11.52     |
-| 4-head multi-head attention  | 8 chars, 4 patterns| 2.2479     | ~9.47      |
+## 9. Evaluation redesign
 
-Theoretical bigram entropy floor (computed independently from data):
-**2.4519** — matches the trained bigram loss almost exactly.
+The most important audit finding was that every results claim used only the
+last randomly sampled training batch. Although `val_data` existed, aggregate
+validation loss was never calculated.
 
-## Generation
+`scripts/common.py` now provides one evaluation contract for every model:
 
-- Implemented `generate()`: autoregressive sampling. Crops input to the
-  last `block_size` tokens each step, takes only the last position's
-  logits, samples via `torch.multinomial` (explicitly chosen over greedy
-  argmax, reasoned through: greedy argmax tends to produce repetitive,
-  boring text; sampling according to the probability distribution allows
-  variety while still favoring higher-probability characters).
-- Explicit assessment of output at this stage, stated plainly rather than
-  overclaimed: expected to be "English-shaped" but not coherent —
-  right local statistics, no real semantic structure — and explicitly
-  reasoned through *why* (no MLP, no residual connections, no LayerNorm,
-  only 8 tokens of context, single attention layer applied once).
-- Extended discussion, explicitly distinguishing **real, learned
-  statistical patterning** (what this model does) from **intelligence**
-  (a loaded term) — landed on the framing that this is genuine,
-  measurable pattern-extraction (evidenced by perplexity dropping
-  step-by-step across the four models), just narrow in scope (short
-  context, single layer, no extra per-position computation, character-level
-  not concept-level) — not a categorically different phenomenon from what
-  larger, more capable models do, just far more scaled up.
+1. Switch the model to evaluation mode.
+2. Disable gradient construction.
+3. Sample 200 batches from training and validation partitions separately.
+4. Average their cross-entropy losses.
+5. Restore training mode.
+6. Report validation perplexity as `exp(validation_loss)`.
 
-## Verification exercise: top-3 prediction check against real validation text
+Periodic training-batch loss remains useful for progress monitoring but is not
+used for model comparison. The old numeric table is historical and must be
+replaced only after executing the corrected scripts.
 
-- Ran the trained 4-head model against a real (never-trained-on) 8-
-  character validation snippet, printing top-3 predicted next-characters
-  with probabilities at every position, alongside the actual next
-  character.
-- **Findings, read in detail, not just summarized**: several exact hits
-  with high confidence at predictable transitions (e.g., punctuation →
-  newline, ~76% and ~30% confidence); confident, categorically correct
-  misses (predicting a vowel when a vowel was needed — top-3 were E/A/I,
-  all vowels, at a position where the true next-letter was also a vowel,
-  just the wrong specific one — same pattern for consonant-following-
-  consonant contexts); and appropriately *low* confidence at genuinely
-  ambiguous positions (start of an unfamiliar proper noun, "GREMIO," which
-  the model had not seen often enough to spell confidently, correctly
-  reflected in a flatter, lower-confidence probability distribution rather
-  than false certainty).
-- This was explicitly chosen as a **more convincing and more checkable**
-  demonstration of real learned structure than either (a) reading raw
-  generated text, or (b) trusting the aggregate loss number alone —
-  because it lets you verify, position by position, whether the model's
-  confidence tracks the real predictability of each specific situation.
+Top-three predictions and generated text remain qualitative diagnostics, not
+aggregate performance evidence.
 
-## Outstanding (not yet built, per source article's later sections)
+## 10. Reproducibility and repository corrections
 
-- Residual connections (`x = x + sublayer(x)`)
-- LayerNorm
-- Feedforward MLP after attention (extra per-position computation)
-- Stacking multiple transformer blocks
-- Larger `block_size` / `n_embd` / more training steps at scale
+The audit implemented:
 
-## Conceptual threads developed beyond direct code, through extended discussion
+- Pinned dependencies in `requirements.txt`
+- Path-independent dataset loading
+- Shared MPS/CPU device selection
+- Shared averaged evaluation
+- Canonical multi-head filename
+- Explicit source and dataset attribution
+- Evidence/checkpoint ignore rules
+- Removal of the temporary `Emil` access-test file
+- Student tasks with immediate evidence and reasoning questions
+- Separation of technical history from unrelated personal reflections
 
-These were substantive learning threads pursued through discussion, not
-just code — included here because they materially shaped understanding of
-*why* the code behaves the way it does, and were treated with the same
-rigor (defining terms precisely, correcting imprecise framings, grounding
-in concrete examples) as the coding work itself.
+A fixed seed improves repeatability, but exact equality across MPS and CPU is
+not promised. Broader claims require multiple seeds with mean and variance.
 
-- **Cross-entropy loss as a direct application of Shannon information
-  theory.** Not asserted — demonstrated empirically: the independently-
-  computed conditional-entropy floor (2.4519) matched the trained bigram
-  model's loss (2.4488) almost exactly. Explicitly distinguished
-  *randomness* (a property of the underlying process), *uncertainty* (an
-  observer's state of not-knowing, arising from randomness), *probability
-  distribution* (the mathematical object quantifying both), and *entropy*
-  (a single summary number computed from that distribution) — as a
-  precise chain, not interchangeable synonyms.
-- **Perplexity (`e^loss`)** developed as an interpretable companion metric
-  — "effective number of equally-likely choices" — computed and
-  interpreted at each stage of the model progression (untrained ≈ 67-70;
-  bigram ≈ 11.57; uniform averaging ≈ 17.47; single-head ≈ 11.52;
-  multi-head ≈ 9.47).
-- **Explicit correction of an overreach**: initially proposed that
-  "patterning has zero entropy" — corrected through worked examples
-  (untrained uniform baseline 4.174 nats → bigram 2.4519 nats floor →
-  near-zero only in the limiting case of a fully deterministic
-  relationship, e.g., "q" almost always followed by "u") to the precise
-  claim: pattern *reduces* entropy relative to a less-informed baseline;
-  it does not, in general, eliminate it. Only a perfectly deterministic
-  mapping reaches exactly zero.
-- **Rate of return / CAGR / IRR** — a brief, separate personal-finance
-  detour (simple return, annualized/CAGR, real return, and where IRR
-  becomes necessary for irregular cash flows), kept clearly labeled as
-  mechanics rather than financial advice.
-- **Connection to *The Drunkard's Walk* (Mlodinow), chapter 1** — explicit
-  reasoning through the relationship between the book's informal theme
-  (humans misjudge randomness, see false patterns) and Shannon entropy as
-  the rigorous, computable version of the same underlying question
-  ("is there really a pattern here, and how much genuine uncertainty
-  remains if not?"). Extended to a discussion of where this bias shows up
-  not just in daily-life judgment (gambler's fallacy, streak illusions)
-  but in professional/scientific contexts (regression to the mean
-  misread as causation, small-sample noise mistaken for real effects,
-  and why rigorous fields build in statistical safeguards — significance
-  testing, replication, large-sample averaging — as an explicit corrective
-  for the same cognitive bias, directly paralleling why this project
-  moved from trusting single-batch loss readings to averaging over many
-  batches and to computing an independent theoretical floor).
-- **Career-direction reflection** ("From Strength to Strength" framing) —
-  a separate, personal discussion connecting observed patterns in this
-  session (independently verifying claims, pushing until reasoning felt
-  earned) to a tension between a stated motivation ("stay in sync with
-  how the new generation thinks") and a stated regret-test answer
-  ("math/probability") — flagged as not automatically pointing to the
-  same career option, with data/teaching/travel weighed against each,
-  kept separate from the technical thread but recorded here since it
-  occurred in the same working session.
+## 11. Git and credential lessons retained
 
-## GitHub / repository management — real project history, including mistakes
+A virtual environment was initially committed before `.gitignore`, causing a
+GitHub large-file rejection. The durable lesson is to create ignore rules
+before staging and to use explicit paths rather than `git add .`.
 
-This section is included deliberately, because the process of getting this
-project onto GitHub involved real mistakes and lessons, not just a clean
-`git push`.
+Credentials were also exposed during early repository work. They were revoked.
+The public technical record retains only the general security lesson: never
+place tokens in chat, source files, remote URLs, evidence, or committed shell
+transcripts. Use a configured GitHub integration or credential manager.
 
-- **First mistake: committing `venv/` before creating `.gitignore`.**
-  A `git push` attempt failed with GitHub rejecting a 203MB file
-  (`libtorch_cpu.dylib`) — exceeding GitHub's 100MB single-file limit.
-  Root cause: `git add .` was run before a `.gitignore` excluding `venv/`
-  existed, so the entire virtual environment (including large compiled
-  PyTorch libraries) got committed into git history. Because the oversized
-  file was already baked into a past commit, simply adding `.gitignore`
-  afterward did not fix it — the fix required either purging history
-  (`git filter-repo`, overkill for a personal repo) or, since the push had
-  already been rejected and nothing was live on GitHub yet, wiping local
-  git history entirely (`rm -rf .git`) and reinitializing cleanly with the
-  correct `.gitignore` in place *before* the first `git add`.
-- **Second mistake, more serious: a live GitHub Personal Access Token was
-  pasted directly into chat.** Treated immediately and explicitly as a
-  security incident — a PAT is equivalent to a password, and pasting it
-  into a chat transcript exposes it in stored conversation history
-  regardless of whether it's ever "used." Explicit lesson recorded and
-  repeated multiple times through the rest of the project: PATs should be
-  revoked immediately upon exposure, never reused after being pasted in
-  chat, and only ever entered directly into a local terminal's
-  credential prompt (or, if used with an AI agent's sandboxed environment
-  for a one-off task, treated as single-use and revoked immediately after,
-  since it still passes through the conversation transcript either way).
-  This lesson was applied twice more in practice: two subsequent tokens
-  were pasted for actual push operations, and both were explicitly
-  revoked immediately after use, as agreed.
-- Repo was ultimately renamed/recreated as **`handmade-gpt-repo`**
-  (public) after an earlier private repo (`GPT-from_Scratch`) was
-  deleted and recreated during cleanup, and a naming mismatch
-  (`homemade-gpt-repo` vs. `homemde-gpt-repo` vs. the actual
-  `handmade-gpt-repo`) briefly caused "Repository not found" errors —
-  resolved by checking the actual repo page directly rather than guessing
-  spelling variants.
-- **Token-permission lesson**: an initial fine-grained PAT could clone
-  (read) the repo but was denied (403) on push — read and write access
-  are separate, explicitly-grantable permissions on a fine-grained token,
-  and cloning successfully does not imply write access. A second token,
-  generated with explicit read/write ("Contents: Read and write")
-  permission, resolved this.
-- Final, correct project structure: `scripts/` folder containing all six
-  Python files (`data.py`, `bigram.py`, `loss-limit.py`,
-  `uniform-context-model.py`, `context-model.py`, `4-context-model.py`),
-  plus root-level `README.md`, `DEVLOG.md`, `LAB.md`, `.gitignore`, and
-  `input.txt`.
+## 12. Open work
+
+The next architecture milestone is a minimal decoder-only Transformer block:
+
+1. Add positional embeddings.
+2. Add an attention output projection.
+3. Add residual connections.
+4. Add pre-normalization.
+5. Add a per-position feedforward network.
+6. Stack blocks.
+7. Evaluate across multiple seeds.
+8. Save checkpoints and machine-readable metrics.
+9. Select a repository license after reviewing source terms.
+
+Only after those mechanisms are present should the implementation be labeled a
+small GPT architecture.
