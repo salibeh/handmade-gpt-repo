@@ -347,7 +347,7 @@ Secrets and complete virtual environments must not be committed.
 | Architecture diagrams | Pending |
 | Report template | Pending |
 | Clean-clone validation harness | Implemented in Step 5 |
-| Full clean-clone execution evidence | Pending instructor host |
+| Full clean-clone execution evidence | Passed on Apple MPS; `evidence/setup/clean-full.json` |
 | Repository license decision | Pending owner decision |
 | External-foundations bridge | Implemented in Step 4 |
 
@@ -405,7 +405,12 @@ visible progress. Learning mode uses 200 training steps and 20 evaluation
 batches; evidence mode preserves 10,000 steps and 200 batches. Device selection
 uses CUDA, then Apple MPS, then CPU.
 
-Development inspection confirmed source compilation, but full clean-clone
-training remains pending because the automation worker does not contain the
-pinned PyTorch runtime. This baseline therefore remains partially implemented;
-the validation harness is not evidence that every completion gate passed.
+Static, learning, and full evidence execution passed on the instructor Apple
+Silicon Mac with PyTorch 2.8.0 and MPS. All six stages returned code 0. The
+canonical clean-execution artifacts are stored under `evidence/setup/`; the
+full artifact was committed as `cd6f82f`.
+
+This satisfies the clean-clone learning/evidence execution portion of Step 5.
+The practicum baseline remains partially implemented because multi-seed
+metrics, accuracy measures, temperature experiments, diagrams, the report
+template, and other completion gates remain pending.
