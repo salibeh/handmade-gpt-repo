@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -12,7 +13,7 @@ N_EMBD = 64
 N_HEAD = 4
 N_LAYER = 2
 DROPOUT = 0.0
-TRAIN_STEPS = 10_000
+TRAIN_STEPS = int(os.getenv("HANDMADE_GPT_TRAIN_STEPS", "10000"))
 
 if N_EMBD % N_HEAD != 0:
     raise ValueError("N_EMBD must be divisible by N_HEAD")
