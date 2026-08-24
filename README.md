@@ -1,41 +1,68 @@
-# GPT From Scratch
+# From Bigram Prediction to Causal Attention
 
-A character-level GPT built from the ground up — bigram model → causal
-averaging → single self-attention head → multi-head attention — with each
-step measured against a theoretical baseline (Shannon entropy) rather than
-taken on faith.
+A character-level language-model learning project inspired by Nikhil Bajpai’s
+Medium article, [“I Built a GPT From Scratch on a MacBook — Days 1–5: From a
+Bigram to a Working Self-Attention
+Head”](https://medium.com/@nikhil.cse16/i-built-a-gpt-from-scratch-on-a-macbook-days-1-5-from-a-bigram-to-a-working-self-attention-head-0d3082ac417c).
 
-See `LAB.md` for a full reproducible walkthrough (macOS setup included),
-and `DEVLOG.md` for a narrative log of what was built, what was tried and
-failed on purpose, and why.
+The project reconstructs the progression:
+
+```text
+bigram → uniform causal context → one attention head → multi-head attention
+```
+
+It deliberately stops short of calling the final model a complete GPT.
+Positional embeddings, feedforward layers, residual connections, LayerNorm,
+and stacked Transformer blocks remain future work.
+
+- [LAB.md](LAB.md): student-facing execution, evidence, and reasoning tasks
+- [DEVLOG.md](DEVLOG.md): focused technical development history
+- [SOURCES.md](SOURCES.md): article, dataset, and attribution record
 
 ## Quick start
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install torch numpy
+git clone https://github.com/salibeh/handmade-gpt-repo.git
+cd handmade-gpt-repo
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
-curl -o input.txt https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
-
-cd scripts
-python3 bigram.py            # baseline: 1 char of context
-python3 loss-limit.py        # theoretical entropy floor, computed from data
-python3 uniform-context-model.py   # 8 chars, uniform weight (negative result)
-python3 context-model.py     # 8 chars, single learned attention head
-python3 4-context-model.py   # 8 chars, 4-head attention + generation demo
+wc -c input.txt
+python scripts/bigram.py
+python scripts/loss-limit.py
+python scripts/uniform-context-model.py
+python scripts/context-model.py
+python scripts/multi_head_model.py
 ```
 
-Note: `input.txt` should be downloaded into the repo root (one level above
-`scripts/`), and scripts should be run from inside `scripts/` since they
-import from `data.py` via a relative import.
+The dataset check should report 1,115,394 bytes.
 
-## Results
+Every training script:
 
-| Model                      | Context             | Final loss | Perplexity |
-|-----------------------------|----------------------|-----------:|-----------:|
-| Bigram                      | 1 character          | ~2.4488    | ~11.57     |
-| Uniform averaging            | 8 chars, equal weight| ~2.8604    | ~17.47     |
-| Single self-attention head   | 8 chars, learned wt  | ~2.4439    | ~11.52     |
-| 4-head multi-head attention  | 8 chars, 4 patterns  | ~2.2479    | ~9.47      |
-| Entropy floor (computed)     | 1 character (theory) | 2.4519     | —          |
+- Selects MPS when available and otherwise uses CPU
+- Prints periodic training-batch loss for progress only
+- Reports averaged training and validation loss over 200 batches
+- Reports validation perplexity
+
+Do not compare models using the last randomly sampled training batch.
+
+## Current model boundary
+
+The final implementation contains causal multi-head attention but no positional
+encoding or complete Transformer block. It is therefore an attention-based
+character language model, not yet a full GPT implementation.
+
+## Reproducibility
+
+Dependencies are pinned in [requirements.txt](requirements.txt). Training uses
+seed 1337, but exact cross-platform equality is not promised because PyTorch
+kernels and MPS/CPU execution may differ. Compare averaged validation results,
+record the device and package versions, and use multiple seeds before making a
+general performance claim.
+
+## License status
+
+No repository license has yet been selected. See [SOURCES.md](SOURCES.md)
+before reusing or redistributing material.
