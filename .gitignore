@@ -3,5 +3,19 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
-evidence/
+.env
+.env.*
+*.pt
+*.pth
+*.ckpt
 checkpoints/
+
+# Ignore ad hoc evidence by default, but retain the practicum's reviewed,
+# compact canonical artifacts in the instructor playground.
+evidence/*
+!evidence/setup/
+!evidence/setup/**
+!evidence/results/
+!evidence/results/**
+!evidence/sampling/
+!evidence/sampling/**
