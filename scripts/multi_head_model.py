@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -11,7 +12,7 @@ BLOCK_SIZE = 8
 N_EMBD = 32
 N_HEAD = 4
 HEAD_SIZE = N_EMBD // N_HEAD
-TRAIN_STEPS = 10_000
+TRAIN_STEPS = int(os.getenv("HANDMADE_GPT_TRAIN_STEPS", "10000"))
 
 torch.manual_seed(SEED)
 device = select_device()
