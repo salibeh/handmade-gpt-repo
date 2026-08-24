@@ -80,11 +80,16 @@ After a clean clone and dependency installation:
 
 ```bash
 python scripts/validate_clean.py --output evidence/setup/clean-static.json
-python scripts/validate_clean.py --execute --output evidence/setup/clean-full.json
+python scripts/validate_clean.py --execute --mode learning \
+  --output evidence/setup/clean-learning.json
+python scripts/validate_clean.py --execute --mode evidence \
+  --output evidence/setup/clean-full.json
 ```
 
-The first check does not prove training completed. The `--execute` result is
-the full clean-runtime artifact.
+The static check does not prove training completed. Learning mode runs 200
+steps per model for rapid end-to-end confirmation. Only evidence mode runs the
+full 10,000 steps per model. The validator displays each script and elapsed
+time while preserving MPS acceleration on Apple Silicon.
 
 ## Architecture boundary
 
